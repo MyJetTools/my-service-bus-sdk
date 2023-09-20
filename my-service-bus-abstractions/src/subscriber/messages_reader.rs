@@ -41,9 +41,7 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
 
     fn handled_ok(&mut self, msg: &mut MySbDeliveredMessage<TMessageModel>) {
         #[cfg(feature = "with-telemetry")]
-        if let Some(event_tracker) = msg.event_tracker.as_mut() {
-            event_tracker.do_not_ignore_this_event();
-        }
+        msg.my_telemetry.enabled_duration_tracking_on_confirmation();
         self.delivered.enqueue(msg.id.get_value());
     }
 

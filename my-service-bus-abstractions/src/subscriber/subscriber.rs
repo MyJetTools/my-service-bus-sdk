@@ -5,6 +5,8 @@ use std::{
 
 use rust_extensions::{Logger, StrOrString};
 
+#[cfg(feature = "with-telemetry")]
+use super::DeliveredMessageTelemetry;
 use crate::{
     queue_with_intervals::QueueWithIntervals, MySbMessage, MyServiceBusSubscriberClient,
     MyServiceBusSubscriberClientCallback,
@@ -86,26 +88,21 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync 
             match content_result {
                 Ok(contract) => {
                     #[cfg(feature = "with-telemetry")]
-                    let mut msg = MySbDeliveredMessage {
-                        id: msg.id,
-                        attempt_no: msg.attempt_no,
-                        headers: msg.headers,
-                        content: Some(contract),
-                        raw: msg.content,
-                        my_telemetry_ctx: None,
-                        event_tracker: None,
-                    };
+                    let my_telemetry = DeliveredMessageTelemetry::new(
+                        self.get_topic_id(),
+                        self.get_queue_id(),
+                        msg.id,
+                        &msg.headers,
+                    );
 
-                    #[cfg(feature = "with-telemetry")]
-                    msg.init_telemetry_context(self.get_topic_id(), self.get_queue_id());
-
-                    #[cfg(not(feature = "with-telemetry"))]
                     let msg = MySbDeliveredMessage {
                         id: msg.id,
                         attempt_no: msg.attempt_no,
                         headers: msg.headers,
                         content: Some(contract),
                         raw: msg.content,
+                        #[cfg(feature = "with-telemetry")]
+                        my_telemetry,
                     };
 
                     messages.push_back(msg);

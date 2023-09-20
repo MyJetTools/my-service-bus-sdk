@@ -1,7 +1,7 @@
-#[cfg(feature = "with-telemetry")]
-use my_telemetry::{EventDurationTracker, MyTelemetryContext};
 use std::collections::HashMap;
 
+#[cfg(feature = "with-telemetry")]
+use super::DeliveredMessageTelemetry;
 use crate::MessageId;
 
 use super::MySbMessageDeserializer;
@@ -13,12 +13,10 @@ pub struct MySbDeliveredMessage<TMessageModel: MySbMessageDeserializer<Item = TM
     pub raw: Vec<u8>,
     pub content: Option<TMessageModel>,
     #[cfg(feature = "with-telemetry")]
-    pub my_telemetry_ctx: Option<MyTelemetryContext>,
-    #[cfg(feature = "with-telemetry")]
-    pub event_tracker: Option<EventDurationTracker>,
+    pub my_telemetry: DeliveredMessageTelemetry,
 }
 
-impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>>
+impl<'s, TMessageModel: MySbMessageDeserializer<Item = TMessageModel>>
     MySbDeliveredMessage<TMessageModel>
 {
     pub fn take_message(&mut self) -> TMessageModel {
@@ -35,36 +33,5 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>>
             return itm;
         }
         panic!("Message was already taken");
-    }
-
-    #[cfg(feature = "with-telemetry")]
-    pub fn init_telemetry_context(&mut self, topic_id: &str, queue_id: &str) {
-        use crate::MY_TELEMETRY_HEADER;
-
-        if let Some(headers) = self.headers.as_ref() {
-            if let Some(telemetry_value) = headers.get(MY_TELEMETRY_HEADER) {
-                if let Ok(my_telemetry) = MyTelemetryContext::parse_from_string(telemetry_value) {
-                    let mut event_duration_tracker = my_telemetry
-                        .start_event_tracking(format!("Handling event {}/{}", topic_id, queue_id,));
-
-                    event_duration_tracker
-                        .add_tag("msg_id".to_string(), self.id.get_value().to_string());
-
-                    event_duration_tracker.ignore_this_event();
-
-                    self.my_telemetry_ctx = Some(my_telemetry);
-                    self.event_tracker = Some(event_duration_tracker)
-                }
-            }
-        }
-    }
-
-    #[cfg(feature = "with-telemetry")]
-    pub fn take_or_create_telemetry(&mut self) -> MyTelemetryContext {
-        if let Some(my_telemetry_ctx) = self.my_telemetry_ctx.take() {
-            return my_telemetry_ctx;
-        }
-
-        MyTelemetryContext::new()
     }
 }
