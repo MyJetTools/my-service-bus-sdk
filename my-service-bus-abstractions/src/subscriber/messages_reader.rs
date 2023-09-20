@@ -39,15 +39,19 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
         }
     }
 
-    fn handled_ok(&mut self, msg: &MySbDeliveredMessage<TMessageModel>) {
+    fn handled_ok(&mut self, msg: &mut MySbDeliveredMessage<TMessageModel>) {
+        #[cfg(feature = "with-telemetry")]
+        if let Some(event_tracker) = msg.event_tracker.as_mut() {
+            event_tracker.do_not_ignore_this_event();
+        }
         self.delivered.enqueue(msg.id.get_value());
     }
 
     pub fn get_next_message<'s>(
         &'s mut self,
     ) -> Option<&'s mut MySbDeliveredMessage<TMessageModel>> {
-        if let Some(message) = self.current_message.take() {
-            self.handled_ok(&message);
+        if let Some(mut message) = self.current_message.take() {
+            self.handled_ok(&mut message);
         }
 
         let messages = self.messages.as_mut()?;
