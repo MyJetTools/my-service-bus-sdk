@@ -63,7 +63,7 @@ impl DeliveredMessageTelemetry {
         }
     }
 
-    pub fn engage_telemetry(&mut self) -> &MyTelemetryContext {
+    pub fn engage_telemetry(&mut self) -> MyTelemetryContext {
         if self.event_duration_tracker.is_none() {
             if let Some(telemetry_event_name) = self.telemetry_event_name.take() {
                 let mut event_duration_tracker =
@@ -80,6 +80,6 @@ impl DeliveredMessageTelemetry {
             }
         }
 
-        &self.ctx
+        self.ctx.clone()
     }
 }
