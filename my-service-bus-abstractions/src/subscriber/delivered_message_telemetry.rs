@@ -5,8 +5,8 @@ use my_telemetry::{EventDurationTracker, MyTelemetryContext};
 use crate::MessageId;
 
 pub struct DeliveredMessageTelemetry {
-    pub telemetry_event_name: Option<String>,
-    pub ctx: MyTelemetryContext,
+    telemetry_event_name: Option<String>,
+    ctx: MyTelemetryContext,
     pub event_duration_tracker: Option<EventDurationTracker>,
     pub ignore_this_event: bool,
     pub message_id: MessageId,
