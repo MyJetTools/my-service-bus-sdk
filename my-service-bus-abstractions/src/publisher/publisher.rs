@@ -133,11 +133,8 @@ impl<TMessageModel: MySbMessageSerializer> MyServiceBusPublisher<TMessageModel> 
         result
     }
 
-    pub async fn publish_messages(
-        &self,
-        messages: &[TMessageModel],
-        #[cfg(feature = "with-telemetry")] telemetry_context: Option<&MyTelemetryContext>,
-    ) -> Result<(), PublishError> {
+    #[cfg(not(feature = "with-telemetry"))]
+    pub async fn publish_messages(&self, messages: &[TMessageModel]) -> Result<(), PublishError> {
         let mut messages_to_publish = Vec::with_capacity(messages.len());
 
         for message in messages {
@@ -155,13 +152,51 @@ impl<TMessageModel: MySbMessageSerializer> MyServiceBusPublisher<TMessageModel> 
                 return Err(PublishError::SerializationError(err));
             }
 
-            #[cfg(not(feature = "with-telemetry"))]
             let (content, headers) = content.unwrap();
+            messages_to_publish.push(MessageToPublish { headers, content });
+        }
 
-            #[cfg(feature = "with-telemetry")]
+        let result = self
+            .client
+            .publish_messages(&self.topic_id, &messages_to_publish, self.do_retries)
+            .await;
+
+        if let Err(err) = &result {
+            let mut ctx = HashMap::new();
+            ctx.insert("topicId".to_string(), self.topic_id.to_string());
+            self.logger.write_error(
+                "publish_messages".to_string(),
+                format!("Can not publish message. Error: {:?}", err),
+                Some(ctx),
+            );
+        }
+
+        result
+    }
+    #[cfg(feature = "with-telemetry")]
+    pub async fn publish_messages<'s>(
+        &'s self,
+        messages: impl Iterator<Item = (&'s TMessageModel, Option<&MyTelemetryContext>)>,
+    ) -> Result<(), PublishError> {
+        let mut messages_to_publish = Vec::new();
+
+        for (message, telemetry_context) in messages {
+            let content = message.serialize(None);
+
+            if let Err(err) = content {
+                let mut ctx = HashMap::new();
+                ctx.insert("topicId".to_string(), self.topic_id.to_string());
+                self.logger.write_fatal_error(
+                    "publish_messages".to_string(),
+                    err.clone(),
+                    Some(ctx),
+                );
+
+                return Err(PublishError::SerializationError(err));
+            }
+
             let (content, mut headers) = content.unwrap();
 
-            #[cfg(feature = "with-telemetry")]
             if let Some(my_telemetry) = telemetry_context.as_ref() {
                 super::my_telemetry::apply_publish_telemetry(&mut headers, my_telemetry)
             }
