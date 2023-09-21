@@ -8,7 +8,7 @@ use crate::{
     subscriber::{MySbDeliveredMessage, MySbMessageDeserializer},
 };
 
-use super::SubscriberData;
+use super::{CurrentMessage, SubscriberData};
 
 pub struct MessagesReader<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> {
     pub data: Arc<SubscriberData>,
@@ -17,7 +17,7 @@ pub struct MessagesReader<TMessageModel: MySbMessageDeserializer<Item = TMessage
     pub confirmation_id: i64,
     delivered: QueueWithIntervals,
     connection_id: i32,
-    current_message: Option<MySbDeliveredMessage<TMessageModel>>,
+    current_message: CurrentMessage<TMessageModel>,
 }
 
 impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReader<TMessageModel> {
@@ -35,7 +35,7 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
             delivered: QueueWithIntervals::new(),
             total_messages_amount,
             connection_id,
-            current_message: None,
+            current_message: CurrentMessage::None,
         }
     }
 
@@ -45,20 +45,40 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
         self.delivered.enqueue(msg.id.get_value());
     }
 
+    fn handle_current_messages_as_ok(&mut self) {
+        match self.current_message.take() {
+            CurrentMessage::Single(mut msg) => self.handled_ok(&mut msg),
+            CurrentMessage::Multiple(msgs) => {
+                for mut msg in msgs {
+                    self.handled_ok(&mut msg)
+                }
+            }
+            CurrentMessage::None => {}
+        }
+    }
+
     pub fn get_next_message<'s>(
         &'s mut self,
     ) -> Option<&'s mut MySbDeliveredMessage<TMessageModel>> {
-        if let Some(mut message) = self.current_message.take() {
-            self.handled_ok(&mut message);
-        }
+        self.handle_current_messages_as_ok();
 
         let messages = self.messages.as_mut()?;
-        self.current_message = Some(messages.pop_front()?);
-        self.current_message.as_mut()
+        let next_message = messages.pop_front()?;
+        self.current_message = CurrentMessage::Single(next_message);
+        Some(self.current_message.unwrap_as_single_message_mut())
     }
 
-    pub fn get_all(&mut self) -> Option<VecDeque<MySbDeliveredMessage<TMessageModel>>> {
-        self.messages.take()
+    pub fn get_all<'s>(
+        &'s mut self,
+    ) -> Option<std::collections::vec_deque::IterMut<'s, MySbDeliveredMessage<TMessageModel>>> {
+        self.handle_current_messages_as_ok();
+
+        let result = self.messages.take();
+
+        let result = result?;
+
+        self.current_message = CurrentMessage::Multiple(result);
+        Some(self.current_message.unwrap_as_iterator())
     }
 }
 

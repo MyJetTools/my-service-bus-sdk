@@ -10,6 +10,8 @@ pub use messages_reader::*;
 pub use queue_type::*;
 pub use subscriber::*;
 pub use subscriber_callback::*;
+mod current_message;
+pub use current_message::*;
 #[cfg(feature = "with-telemetry")]
 mod delivered_message_telemetry;
 #[cfg(feature = "with-telemetry")]
