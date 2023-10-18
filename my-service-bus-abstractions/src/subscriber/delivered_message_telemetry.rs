@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use my_telemetry::{EventDurationTracker, MyTelemetryContext};
+use rust_extensions::StrOrString;
 
 use crate::MessageId;
 
@@ -47,6 +48,7 @@ impl DeliveredMessageTelemetry {
             ctx: MyTelemetryContext::new(),
             event_duration_tracker: None,
             ignore_this_event: true,
+
             message_id,
         }
     }
@@ -81,5 +83,23 @@ impl DeliveredMessageTelemetry {
         }
 
         self.ctx.clone()
+    }
+
+    pub fn add_tag(
+        &mut self,
+        key: impl Into<StrOrString<'static>>,
+        value: impl Into<StrOrString<'static>>,
+    ) {
+        match self.event_duration_tracker.as_mut() {
+            Some(event_duration_tracker) => {
+                let key: StrOrString<'static> = key.into();
+                let value: StrOrString<'static> = value.into();
+
+                event_duration_tracker.add_tag(key.to_string(), value.to_string());
+            }
+            None => {
+                panic!("Telemetry is not engaged. Please call engage_telemetry before adding tags")
+            }
+        }
     }
 }
