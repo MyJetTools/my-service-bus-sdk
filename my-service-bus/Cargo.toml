@@ -1,6 +1,6 @@
 [package]
 name = "my-service-bus"
-version = "0.1.0"
+version = "1.0.2"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -15,6 +15,6 @@ client = ["my-service-bus-tcp-client"]
 [dependencies]
 my-service-bus-abstractions = { path = "../my-service-bus-abstractions" }
 my-service-bus-shared = { optional = true, path = "../my-service-bus-shared" }
-my-service-bus-tcp-client = {optional = true, path = "../my-service-bus-tcp-client" }
+my-service-bus-tcp-client = { optional = true, path = "../my-service-bus-tcp-client" }
 my-service-bus-tcp-shared = { optional = true, path = "../my-service-bus-tcp-shared" }
 my-service-bus-macros = { optional = true, path = "../my-service-bus-macros" }
