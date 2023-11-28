@@ -55,7 +55,7 @@ pub fn generate(attr: TokenStream, input: TokenStream) -> Result<proc_macro::Tok
             type Item = Self;
 
             fn deserialize(bytes: &[u8], _: &Option<std::collections::HashMap<String, String>>) -> Result<Self, my_service_bus::abstractions::SubscriberError> {
-                match prost::Message::decode(bytes) {
+                match self.from_protobuf_bytes(bytes) {
                     Ok(ok) => Ok(ok),
                     Err(err) => Err(
                         my_service_bus::abstractions::SubscriberError::CanNotDeserializeMessage(format!(
