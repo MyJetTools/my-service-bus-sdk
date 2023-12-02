@@ -1,22 +1,16 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use types_reader::ParamsList;
+use types_reader::TokensObject;
 
 pub fn generate(attr: TokenStream, input: TokenStream) -> Result<proc_macro::TokenStream, syn::Error> {
     let ast: syn::DeriveInput = syn::parse(input).unwrap();
 
 
-    let attrs = ParamsList::new(attr.into(), ||None)?;
+    let attr: proc_macro2::TokenStream = attr.into();
 
-    let topic_id = attrs.try_get_from_single_or_named("topic_id");
+    let attrs = TokensObject::new(attr.into(), &||None)?;
 
-    if topic_id.is_none() {
-        panic!("topic_id parameter is required");
-    }
-
-    let topic_id = topic_id.unwrap();
-
-    let topic_id = topic_id.unwrap_as_string_value()?.as_str();
+    let topic_id:&str = attrs.get_value_from_single_or_named("topic_id")?.try_into()?;
 
     let struct_name = &ast.ident;
 
