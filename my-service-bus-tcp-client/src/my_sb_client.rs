@@ -33,8 +33,8 @@ impl TcpConnectionSettings {
 
 #[async_trait::async_trait]
 impl TcpClientSocketSettings for TcpConnectionSettings {
-    async fn get_host_port(&self) -> String {
-        self.my_sb_settings.get_host_port().await
+    async fn get_host_port(&self) -> Option<String> {
+        self.my_sb_settings.get_host_port().await.into()
     }
 }
 
