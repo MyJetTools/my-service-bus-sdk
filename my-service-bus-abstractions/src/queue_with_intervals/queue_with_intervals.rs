@@ -2,6 +2,7 @@ use crate::queue_with_intervals::queue_index_range::{QueueIndexRange, RemoveResu
 
 use super::{iterator::QueueWithIntervalsIterator, queue_index_range::QueueIndexRangeCompare};
 
+const MIN_CAPACITY: usize = 32;
 #[derive(Debug, Clone)]
 pub enum QueueWithIntervalsError {
     MessagesNotFound,
@@ -34,8 +35,17 @@ impl QueueWithIntervals {
         result
     }
 
+    fn remove_queue_index_range(&mut self, index: usize) -> QueueIndexRange {
+        let result = self.intervals.remove(index);
+        if self.intervals.len() < MIN_CAPACITY {
+            self.intervals.shrink_to(MIN_CAPACITY);
+        }
+        result
+    }
+
     pub fn reset(&mut self, intervals: Vec<QueueIndexRange>) {
         self.intervals.clear();
+        self.intervals.shrink_to(intervals.len());
         self.intervals.extend(intervals)
     }
 
@@ -46,7 +56,7 @@ impl QueueWithIntervals {
         }
 
         while self.intervals.len() > 1 {
-            self.intervals.remove(self.intervals.len() - 1);
+            self.remove_queue_index_range(self.intervals.len() - 1);
         }
     }
 
@@ -67,7 +77,7 @@ impl QueueWithIntervals {
                         self.intervals.insert(index + 1, new_item);
                     }
                     RemoveResult::RemoveItem => {
-                        self.intervals.remove(index);
+                        self.remove_queue_index_range(index);
                     }
                 }
 
@@ -118,7 +128,7 @@ impl QueueWithIntervals {
                     let current_el = self.intervals.get(index_we_handled).unwrap().clone();
                     let before_el = self.intervals.get_mut(index_we_handled - 1).unwrap();
                     if before_el.try_join_with_the_next_one(current_el) {
-                        self.intervals.remove(index_we_handled);
+                        self.remove_queue_index_range(index_we_handled);
                     }
                 }
 
@@ -127,7 +137,7 @@ impl QueueWithIntervals {
 
                     let current_el = self.intervals.get_mut(index_we_handled).unwrap();
                     if current_el.try_join_with_the_next_one(after_el) {
-                        self.intervals.remove(index_we_handled + 1);
+                        self.remove_queue_index_range(index_we_handled + 1);
                     }
                 }
             }
@@ -164,7 +174,7 @@ impl QueueWithIntervals {
             let next = self.intervals.get(index + 1).unwrap().clone();
 
             if next.can_be_joined_to_interval_from_the_left(el_to_id) {
-                let removed = self.intervals.remove(index + 1);
+                let removed = self.remove_queue_index_range(index + 1);
                 self.intervals.get_mut(index).unwrap().to_id = removed.to_id;
                 continue;
             }
@@ -216,7 +226,7 @@ impl QueueWithIntervals {
             }
 
             while cover_indexes.len() > 1 {
-                self.intervals.remove(cover_indexes.len() - 1);
+                self.remove_queue_index_range(cover_indexes.len() - 1);
                 cover_indexes.remove(0);
             }
 
@@ -273,7 +283,7 @@ impl QueueWithIntervals {
 
         let from_index = from_index.unwrap();
         while from_index < self.intervals.len() - 1 {
-            let next_range = self.intervals.remove(from_index + 1);
+            let next_range = self.remove_queue_index_range(from_index + 1);
 
             if next_range.can_be_joined_to_interval_from_the_left(range_to_insert.to_id) {
                 self.intervals.get_mut(from_index).unwrap().to_id = next_range.to_id;
@@ -290,7 +300,7 @@ impl QueueWithIntervals {
         let result = first_interval.dequeue();
 
         if first_interval.is_empty() && self.intervals.len() > 1 {
-            self.intervals.remove(0);
+            self.remove_queue_index_range(0);
         }
 
         result
