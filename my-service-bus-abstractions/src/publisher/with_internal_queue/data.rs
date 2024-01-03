@@ -1,7 +1,6 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
+
+use rust_extensions::auto_shrink::VecDequeAutoShrink;
 
 use tokio::sync::Mutex;
 
@@ -10,14 +9,14 @@ use crate::MyServiceBusPublisherClient;
 use super::super::MessageToPublish;
 
 pub struct QueueToPublish {
-    pub queue: VecDeque<MessageToPublish>,
+    pub queue: VecDequeAutoShrink<MessageToPublish>,
     pub being_published: usize,
 }
 
 impl QueueToPublish {
     pub fn new() -> Self {
         Self {
-            queue: VecDeque::new(),
+            queue: VecDequeAutoShrink::new(32),
             being_published: 0,
         }
     }
