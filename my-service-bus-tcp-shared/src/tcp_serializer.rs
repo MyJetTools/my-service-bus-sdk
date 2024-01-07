@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use my_tcp_sockets::{
     socket_reader::{ReadingTcpContractFail, SocketReader},
-    TcpSocketSerializer,
+    TcpPayload, TcpSocketSerializer,
 };
 
 use crate::{ConnectionAttributes, PacketProtVer, TcpContract};
@@ -22,9 +22,9 @@ impl MySbTcpSerializer {
 
 #[async_trait]
 impl TcpSocketSerializer<TcpContract> for MySbTcpSerializer {
-    const PING_PACKET_IS_SINGLETONE: bool = true;
+    const PING_PACKET_IS_SINGLETON: bool = true;
 
-    fn serialize(&self, contract: TcpContract) -> Vec<u8> {
+    fn serialize<'s>(&self, contract: &'s TcpContract) -> TcpPayload<'s> {
         contract.serialize(self.attr.protocol_version)
     }
     fn get_ping(&self) -> TcpContract {
@@ -38,6 +38,7 @@ impl TcpSocketSerializer<TcpContract> for MySbTcpSerializer {
         Ok(result)
     }
 
+    /*
     fn apply_packet(&mut self, contract: &TcpContract) -> bool {
         match contract {
             TcpContract::Greeting {
@@ -54,9 +55,5 @@ impl TcpSocketSerializer<TcpContract> for MySbTcpSerializer {
             _ => false,
         }
     }
-
-    fn serialize_ref(&self, contract: &TcpContract) -> Vec<u8> {
-        let contract = contract.clone();
-        contract.serialize(self.attr.protocol_version)
-    }
+     */
 }

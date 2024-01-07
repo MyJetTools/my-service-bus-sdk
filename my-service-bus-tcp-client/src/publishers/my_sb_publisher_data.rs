@@ -37,20 +37,20 @@ impl MySbPublisherData {
 
         let request_id = self.get_next_request_id();
 
-        let tcp_contract =
+        let payload =
             TcpContract::compile_publish_payload(topic_id, request_id, messages, false, 3);
 
-        Ok((request_id, TcpContract::Raw(tcp_contract)))
+        Ok((request_id, TcpContract::Raw(payload)))
     }
 
     pub async fn publish_to_socket(
         &mut self,
-        tcp_contract: &TcpContract,
+        tcp_contract: &mut TcpContract,
         request_id: i64,
     ) -> TaskCompletionAwaiter<(), PublishError> {
         let connection = self.connection.as_mut().unwrap();
 
-        connection.socket.send_ref(tcp_contract).await;
+        connection.socket.send(tcp_contract).await;
 
         let mut task = TaskCompletion::new();
         let awaiter = task.get_awaiter();

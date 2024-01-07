@@ -20,7 +20,7 @@ impl TcpClientData {
     pub async fn new_incoming_data(
         &self,
         connection: Arc<
-            my_tcp_sockets::tcp_connection::SocketConnection<
+            my_tcp_sockets::tcp_connection::TcpSocketConnection<
                 my_service_bus_tcp_shared::TcpContract,
                 MySbTcpSerializer,
             >,

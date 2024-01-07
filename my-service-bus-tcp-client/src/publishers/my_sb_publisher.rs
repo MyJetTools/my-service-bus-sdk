@@ -4,7 +4,7 @@ use my_service_bus_abstractions::{
     publisher::MessageToPublish, MyServiceBusPublisherClient, PublishError,
 };
 use my_service_bus_tcp_shared::{MySbTcpSerializer, TcpContract};
-use my_tcp_sockets::tcp_connection::SocketConnection;
+use my_tcp_sockets::tcp_connection::TcpSocketConnection;
 use tokio::sync::Mutex;
 
 use crate::new_connection_handler::PROTOCOL_VERSION;
@@ -30,7 +30,7 @@ impl MySbPublishers {
 
     pub async fn new_connection(
         &self,
-        connection: Arc<SocketConnection<TcpContract, MySbTcpSerializer>>,
+        connection: Arc<TcpSocketConnection<TcpContract, MySbTcpSerializer>>,
     ) {
         {
             let mut write_access = self.data.lock().await;
@@ -126,7 +126,7 @@ impl MyServiceBusPublisherClient for MySbPublishers {
 
                 match result {
                     Ok(_) => {
-                        let (request_id, tcp_contract) = to_send.as_ref().unwrap();
+                        let (request_id, tcp_contract) = to_send.as_mut().unwrap();
 
                         let awaiter = write_access
                             .publish_to_socket(tcp_contract, *request_id)
