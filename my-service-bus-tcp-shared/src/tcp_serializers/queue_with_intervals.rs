@@ -1,12 +1,18 @@
 use my_service_bus_abstractions::queue_with_intervals::QueueIndexRange;
-use my_tcp_sockets::socket_reader::{ReadingTcpContractFail, SocketReader};
+use my_tcp_sockets::{
+    socket_reader::{ReadingTcpContractFail, SocketReader},
+    TcpWriteBuffer,
+};
 
-pub fn serialize(payload: &mut Vec<u8>, value: &Vec<QueueIndexRange>) {
-    super::i32::serialize(payload, value.len() as i32);
+pub fn serialize(write_buffer: &mut impl TcpWriteBuffer, value: &Vec<QueueIndexRange>) {
+    write_buffer.write_i32(value.len() as i32);
+    //super::i32::serialize(payload, value.len() as i32);
 
     for itm in value {
-        super::i64::serialize(payload, itm.from_id);
-        super::i64::serialize(payload, itm.to_id);
+        write_buffer.write_i64(itm.from_id);
+        //super::i64::serialize(payload, itm.from_id);
+        write_buffer.write_i64(itm.to_id);
+        //super::i64::serialize(payload, itm.to_id);
     }
 }
 

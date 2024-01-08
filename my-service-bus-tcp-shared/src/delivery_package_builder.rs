@@ -1,4 +1,5 @@
 use my_service_bus_abstractions::MyServiceBusMessage;
+use my_tcp_sockets::TcpWriteBuffer;
 
 use crate::{tcp_message_id, tcp_serializers::*, PacketProtVer, TcpContract};
 
@@ -13,8 +14,8 @@ impl DeliverTcpPacketBuilder {
     pub fn new(topic_id: &str, queue_id: &str, subscriber_id: i64, version: PacketProtVer) -> Self {
         let mut payload = Vec::new();
         payload.push(tcp_message_id::NEW_MESSAGES);
-        pascal_string::serialize(&mut payload, topic_id);
-        pascal_string::serialize(&mut payload, queue_id);
+        payload.write_pascal_string(topic_id);
+        payload.write_pascal_string(queue_id);
         i64::serialize(&mut payload, subscriber_id);
 
         let amount_offset = payload.len();

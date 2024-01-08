@@ -7,8 +7,6 @@ use my_service_bus_tcp_shared::{MySbTcpSerializer, TcpContract};
 use my_tcp_sockets::tcp_connection::TcpSocketConnection;
 use tokio::sync::Mutex;
 
-use crate::new_connection_handler::PROTOCOL_VERSION;
-
 use super::{MySbPublisherData, PublishProcessByConnection};
 
 pub struct MySbPublishers {
@@ -39,10 +37,7 @@ impl MySbPublishers {
 
         for topic_id in self.get_topics_to_create().await {
             let packet = TcpContract::CreateTopicIfNotExists { topic_id };
-
-            connection
-                .send_bytes(packet.serialize(PROTOCOL_VERSION).as_slice())
-                .await;
+            connection.send(&packet).await;
         }
     }
 

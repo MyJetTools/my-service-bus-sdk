@@ -16,7 +16,9 @@ pub async fn send_greeting(
         protocol_version: PROTOCOL_VERSION,
     };
 
-    let payload = greeting.serialize(PROTOCOL_VERSION);
+    let mut payload = Vec::new();
+
+    greeting.serialize(&mut payload, PROTOCOL_VERSION);
     socket_ctx.send_bytes(payload.as_slice()).await;
 }
 
@@ -27,7 +29,9 @@ pub async fn send_packet_versions(
     packet_versions.insert(my_service_bus_tcp_shared::tcp_message_id::NEW_MESSAGES, 1);
 
     let packet_versions = TcpContract::PacketVersions { packet_versions };
-    let payload = packet_versions.serialize(PROTOCOL_VERSION);
+
+    let mut payload = Vec::new();
+    packet_versions.serialize(&mut payload, PROTOCOL_VERSION);
 
     socket_ctx.send_bytes(payload.as_slice()).await;
 }

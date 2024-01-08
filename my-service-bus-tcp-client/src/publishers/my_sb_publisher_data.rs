@@ -37,8 +37,15 @@ impl MySbPublisherData {
 
         let request_id = self.get_next_request_id();
 
-        let payload =
-            TcpContract::compile_publish_payload(topic_id, request_id, messages, false, 3);
+        let mut payload = Vec::new();
+        TcpContract::compile_publish_payload(
+            &mut payload,
+            topic_id,
+            request_id,
+            messages,
+            false,
+            3,
+        );
 
         Ok((request_id, TcpContract::Raw(payload)))
     }

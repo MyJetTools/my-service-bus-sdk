@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use my_tcp_sockets::socket_reader::{ReadingTcpContractFail, SocketReader};
+use my_tcp_sockets::{
+    socket_reader::{ReadingTcpContractFail, SocketReader},
+    TcpWriteBuffer,
+};
 
 pub async fn deserialize<TSocketReader: SocketReader>(
     reader: &mut TSocketReader,
@@ -23,7 +26,10 @@ pub async fn deserialize<TSocketReader: SocketReader>(
     Ok(Some(result))
 }
 
-pub fn serialize(data: &mut Vec<u8>, headers: Option<&HashMap<String, String>>) {
+pub fn serialize(
+    write_buffer: &mut impl TcpWriteBuffer,
+    headers: Option<&HashMap<String, String>>,
+) {
     match headers {
         Some(headers) => {
             let mut headers_count = headers.len();
@@ -32,7 +38,7 @@ pub fn serialize(data: &mut Vec<u8>, headers: Option<&HashMap<String, String>>) 
                 headers_count = 255;
             }
 
-            data.push(headers_count as u8);
+            write_buffer.write_byte(headers_count as u8);
 
             let mut i = 0;
 
@@ -41,14 +47,17 @@ pub fn serialize(data: &mut Vec<u8>, headers: Option<&HashMap<String, String>>) 
                     break;
                 }
 
-                super::pascal_string::serialize(data, key);
-                super::pascal_string::serialize(data, value);
+                write_buffer.write_pascal_string(key);
+                //super::pascal_string::serialize(data, key);
+
+                write_buffer.write_pascal_string(value);
+                //super::pascal_string::serialize(data, value);
 
                 i += 1;
             }
         }
         None => {
-            data.push(0);
+            write_buffer.write_byte(0);
         }
     }
 }

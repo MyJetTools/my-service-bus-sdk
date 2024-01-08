@@ -83,13 +83,7 @@ impl MySbSubscribers {
                 queue_type: subscriber.get_queue_type(),
             };
 
-            connection
-                .send_bytes(
-                    packet
-                        .serialize(crate::new_connection_handler::PROTOCOL_VERSION)
-                        .as_slice(),
-                )
-                .await;
+            connection.send(&packet).await;
         }
     }
     pub async fn disconnect(&self) {
