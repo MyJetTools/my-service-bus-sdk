@@ -35,6 +35,19 @@ impl TcpSocketSerializer<TcpContract> for MySbTcpSerializer {
         socket_reader: &mut TSocketReader,
     ) -> Result<TcpContract, ReadingTcpContractFail> {
         let result = TcpContract::deserialize(socket_reader, &self.attr).await?;
+
+        match &result {
+            TcpContract::Greeting {
+                name: _,
+                protocol_version,
+            } => {
+                self.attr.protocol_version = *protocol_version;
+            }
+            TcpContract::PacketVersions { packet_versions } => {
+                self.attr.versions.update(packet_versions);
+            }
+            _ => {}
+        }
         Ok(result)
     }
 
