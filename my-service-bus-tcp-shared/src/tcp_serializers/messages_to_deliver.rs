@@ -28,7 +28,7 @@ pub fn serialize_v3(dest: &mut Vec<u8>, msg: &impl MyServiceBusMessage) {
     super::byte_array::serialize(dest, msg.get_content());
 }
 
-pub async fn deserialize<TSocketReader: SocketReader>(
+pub async fn deserialize<TSocketReader: SocketReader + Send + Sync + 'static>(
     socket_reader: &mut TSocketReader,
     version: &PacketProtVer,
 ) -> Result<MySbMessage, ReadingTcpContractFail> {
@@ -39,7 +39,7 @@ pub async fn deserialize<TSocketReader: SocketReader>(
     return deserialize_v3(socket_reader).await;
 }
 
-pub async fn deserialize_v2<TSocketReader: SocketReader>(
+pub async fn deserialize_v2<TSocketReader: SocketReader + Send + Sync + 'static>(
     socket_reader: &mut TSocketReader,
     packet_version: i32,
 ) -> Result<MySbMessage, ReadingTcpContractFail> {
@@ -63,7 +63,7 @@ pub async fn deserialize_v2<TSocketReader: SocketReader>(
     Ok(result)
 }
 
-pub async fn deserialize_v3<TSocketReader: SocketReader>(
+pub async fn deserialize_v3<TSocketReader: SocketReader + Send + Sync + 'static>(
     socket_reader: &mut TSocketReader,
 ) -> Result<MySbMessage, ReadingTcpContractFail> {
     let id = socket_reader.read_i64().await?;

@@ -16,7 +16,7 @@ pub fn serialize(write_buffer: &mut impl TcpWriteBuffer, value: &Vec<QueueIndexR
     }
 }
 
-pub async fn deserialize<T: SocketReader>(
+pub async fn deserialize<T: SocketReader + Send + Sync + 'static>(
     reader: &mut T,
 ) -> Result<Vec<QueueIndexRange>, ReadingTcpContractFail> {
     let len = reader.read_i32().await?;

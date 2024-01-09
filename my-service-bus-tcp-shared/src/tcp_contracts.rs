@@ -87,7 +87,7 @@ pub enum TcpContract {
 }
 
 impl TcpContract {
-    pub async fn deserialize<TSocketReader: SocketReader>(
+    pub async fn deserialize<TSocketReader: SocketReader + Send + Sync + 'static>(
         socket_reader: &mut TSocketReader,
         attr: &ConnectionAttributes,
     ) -> Result<TcpContract, ReadingTcpContractFail> {
