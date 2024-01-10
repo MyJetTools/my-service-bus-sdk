@@ -1,7 +1,6 @@
+use crate::TcpProtocolVersion;
 use my_service_bus_abstractions::publisher::MessageToPublish;
 use my_tcp_sockets::TcpWriteBuffer;
-
-use crate::TcpProtocolVersion;
 
 pub fn serialize(
     write_buffer: &mut impl TcpWriteBuffer,

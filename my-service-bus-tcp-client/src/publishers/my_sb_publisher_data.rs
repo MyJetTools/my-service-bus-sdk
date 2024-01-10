@@ -4,8 +4,6 @@ use my_service_bus_abstractions::{publisher::MessageToPublish, PublishError};
 use my_service_bus_tcp_shared::TcpContract;
 use rust_extensions::{TaskCompletion, TaskCompletionAwaiter};
 
-use crate::new_connection_handler::CLIENT_SERIALIZER_METADATA;
-
 use super::PublishProcessByConnection;
 
 pub struct MySbPublisherData {
@@ -32,6 +30,7 @@ impl MySbPublisherData {
         &mut self,
         topic_id: &str,
         messages: &[MessageToPublish],
+        protocol_version: my_service_bus_tcp_shared::TcpProtocolVersion,
     ) -> Result<(i64, TcpContract), PublishError> {
         if self.connection.is_none() {
             return Err(PublishError::NoConnectionToPublish);
@@ -40,13 +39,14 @@ impl MySbPublisherData {
         let request_id = self.get_next_request_id();
 
         let mut payload = Vec::new();
+
         TcpContract::compile_publish_payload(
             &mut payload,
             topic_id,
             request_id,
             messages,
             false,
-            &CLIENT_SERIALIZER_METADATA,
+            protocol_version,
         );
 
         Ok((request_id, TcpContract::Raw(payload)))
@@ -59,10 +59,7 @@ impl MySbPublisherData {
     ) -> TaskCompletionAwaiter<(), PublishError> {
         let connection = self.connection.as_mut().unwrap();
 
-        connection
-            .socket
-            .send(tcp_contract, &CLIENT_SERIALIZER_METADATA)
-            .await;
+        connection.socket.send(tcp_contract).await;
 
         let mut task = TaskCompletion::new();
         let awaiter = task.get_awaiter();

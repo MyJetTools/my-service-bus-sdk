@@ -350,7 +350,7 @@ impl TcpContract {
                 *request_id,
                 data_to_publish.as_slice(),
                 *persist_immediately,
-                serializer_metadata,
+                serializer_metadata.tcp_protocol_version,
             ),
             TcpContract::PublishResponse { request_id } => {
                 write_buffer.write_byte(PUBLISH_RESPONSE);
@@ -524,7 +524,7 @@ impl TcpContract {
         request_id: i64,
         data_to_publish: &[MessageToPublish],
         persist_immediately: bool,
-        meta_data: &MySbSerializerMetadata,
+        tcp_protocol_version: crate::TcpProtocolVersion,
     ) {
         write_buffer.write_byte(PUBLISH);
         write_buffer.write_pascal_string(topic_id);
@@ -536,7 +536,7 @@ impl TcpContract {
         crate::tcp_serializers::messages_to_publish::serialize(
             write_buffer,
             &data_to_publish,
-            meta_data.tcp_protocol_version,
+            tcp_protocol_version,
         );
 
         write_buffer.write_bool(persist_immediately);

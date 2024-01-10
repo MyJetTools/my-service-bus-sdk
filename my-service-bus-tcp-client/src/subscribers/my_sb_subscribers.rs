@@ -9,8 +9,6 @@ use my_service_bus_tcp_shared::{MySbSerializerMetadata, MySbTcpSerializer, TcpCo
 use my_tcp_sockets::tcp_connection::TcpSocketConnection;
 use tokio::sync::Mutex;
 
-use crate::new_connection_handler::CLIENT_SERIALIZER_METADATA;
-
 use super::MySbSubscribersData;
 
 pub struct MySbSubscribers {
@@ -87,7 +85,7 @@ impl MySbSubscribers {
                 queue_type: subscriber.get_queue_type(),
             };
 
-            connection.send(&packet, &CLIENT_SERIALIZER_METADATA).await;
+            connection.send(&packet).await;
         }
     }
     pub async fn disconnect(&self) {
@@ -106,9 +104,7 @@ impl MySbSubscribers {
 
             if let Some(connection) = connection {
                 if connection.id == connection_id {
-                    connection
-                        .send(&mut tcp_contract, &CLIENT_SERIALIZER_METADATA)
-                        .await;
+                    connection.send(&mut tcp_contract).await;
                 }
             }
         });

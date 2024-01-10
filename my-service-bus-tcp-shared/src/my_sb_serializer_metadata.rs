@@ -3,6 +3,8 @@ use crate::{TcpContract, TcpProtocolVersion};
 use super::PacketVersions;
 
 use my_tcp_sockets::TcpSerializationMetadata;
+
+pub const DEFAULT_TCP_PROTOCOL_VERSION: i32 = 3;
 #[derive(Debug, Clone)]
 pub struct PacketProtVer {
     pub packet_version: u8,
@@ -16,11 +18,18 @@ pub struct MySbSerializerMetadata {
 }
 
 impl Default for MySbSerializerMetadata {
+    #[cfg(not(feature = "tcp-client"))]
     fn default() -> Self {
-        Self {
-            versions: PacketVersions::new(),
-            tcp_protocol_version: 0i32.into(),
-        }
+        Self::new(0)
+    }
+
+    #[cfg(feature = "tcp-client")]
+    fn default() -> Self {
+        let mut result = Self::new(DEFAULT_TCP_PROTOCOL_VERSION);
+        result
+            .versions
+            .set_packet_version(crate::tcp_message_id::NEW_MESSAGES, 1);
+        result
     }
 }
 
@@ -44,6 +53,8 @@ impl MySbSerializerMetadata {
 }
 
 impl TcpSerializationMetadata<TcpContract> for MySbSerializerMetadata {
+    const THERE_IS_METADATA: bool = true;
+
     fn apply_tcp_contract(&mut self, contract: &TcpContract) {
         match contract {
             TcpContract::Greeting {

@@ -7,8 +7,6 @@ use my_service_bus_tcp_shared::{MySbSerializerMetadata, MySbTcpSerializer, TcpCo
 use my_tcp_sockets::tcp_connection::TcpSocketConnection;
 use tokio::sync::Mutex;
 
-use crate::new_connection_handler::CLIENT_SERIALIZER_METADATA;
-
 use super::{MySbPublisherData, PublishProcessByConnection};
 
 pub struct MySbPublishers {
@@ -41,7 +39,7 @@ impl MySbPublishers {
 
         for topic_id in self.get_topics_to_create().await {
             let packet = TcpContract::CreateTopicIfNotExists { topic_id };
-            connection.send(&packet, &CLIENT_SERIALIZER_METADATA).await;
+            connection.send(&packet).await;
         }
     }
 
@@ -109,7 +107,11 @@ impl MyServiceBusPublisherClient for MySbPublishers {
 
                 let result = if to_send.is_none() {
                     let result = write_access
-                        .compile_publish_payload(topic_id, messages)
+                        .compile_publish_payload(
+                            topic_id,
+                            messages,
+                            my_service_bus_tcp_shared::DEFAULT_TCP_PROTOCOL_VERSION.into(),
+                        )
                         .await;
 
                     match result {
