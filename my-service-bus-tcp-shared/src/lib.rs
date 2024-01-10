@@ -3,14 +3,16 @@ pub mod tcp_contract_to_string;
 pub mod tcp_message_id;
 pub mod tcp_serializers;
 
-mod connection_attrs;
+mod my_sb_serializer_metadata;
 mod packet_versions;
 
 mod tcp_contracts;
 mod tcp_serializer;
 
-pub use connection_attrs::{ConnectionAttributes, PacketProtVer};
+pub use my_sb_serializer_metadata::*;
 
 pub use packet_versions::PacketVersions;
 pub use tcp_contracts::TcpContract;
 pub use tcp_serializer::MySbTcpSerializer;
+mod tcp_protocol_version;
+pub use tcp_protocol_version::*;

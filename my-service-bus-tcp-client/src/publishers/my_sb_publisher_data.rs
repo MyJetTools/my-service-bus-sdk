@@ -4,6 +4,8 @@ use my_service_bus_abstractions::{publisher::MessageToPublish, PublishError};
 use my_service_bus_tcp_shared::TcpContract;
 use rust_extensions::{TaskCompletion, TaskCompletionAwaiter};
 
+use crate::new_connection_handler::CLIENT_SERIALIZER_METADATA;
+
 use super::PublishProcessByConnection;
 
 pub struct MySbPublisherData {
@@ -44,7 +46,7 @@ impl MySbPublisherData {
             request_id,
             messages,
             false,
-            3,
+            &CLIENT_SERIALIZER_METADATA,
         );
 
         Ok((request_id, TcpContract::Raw(payload)))
@@ -57,7 +59,10 @@ impl MySbPublisherData {
     ) -> TaskCompletionAwaiter<(), PublishError> {
         let connection = self.connection.as_mut().unwrap();
 
-        connection.socket.send(tcp_contract).await;
+        connection
+            .socket
+            .send(tcp_contract, &CLIENT_SERIALIZER_METADATA)
+            .await;
 
         let mut task = TaskCompletion::new();
         let awaiter = task.get_awaiter();

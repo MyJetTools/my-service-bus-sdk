@@ -55,16 +55,12 @@ mod tests {
     use my_service_bus_abstractions::MySbMessage;
 
     use super::*;
-    use crate::{PacketProtVer, TcpContract};
+    use crate::{tcp_message_id::NEW_MESSAGES, MySbSerializerMetadata, TcpContract};
 
     #[tokio::test]
     async fn test_basic_use_case_v2() {
-        const PROTOCOL_VERSION: i32 = 2;
-
-        let version = PacketProtVer {
-            packet_version: 1,
-            protocol_version: PROTOCOL_VERSION,
-        };
+        let mut metadata = MySbSerializerMetadata::new(2);
+        metadata.versions.set_packet_version(NEW_MESSAGES, 1);
 
         let mut headers = HashMap::new();
         headers.insert("1".to_string(), "1".to_string());
@@ -84,15 +80,19 @@ mod tests {
             attempt_no: 2,
         };
 
-        let mut builder =
-            DeliverTcpPacketBuilder::new("test_topic", "test_queue", 15, version.clone());
+        let mut builder = DeliverTcpPacketBuilder::new(
+            "test_topic",
+            "test_queue",
+            15,
+            metadata.get(NEW_MESSAGES),
+        );
 
         builder.append_packet(&msg1);
         builder.append_packet(&msg2);
 
         let tcp_contract = builder.get_result();
 
-        let result = convert_from_raw(tcp_contract, &version).await;
+        let result = convert_from_raw(tcp_contract, &metadata).await;
 
         if let TcpContract::NewMessages {
             topic_id,
@@ -124,12 +124,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_basic_use_case_v3() {
-        const PROTOCOL_VERSION: i32 = 3;
-
-        let version = PacketProtVer {
-            packet_version: 1,
-            protocol_version: PROTOCOL_VERSION,
-        };
+        let mut metadata = MySbSerializerMetadata::new(3);
+        metadata.versions.set_packet_version(NEW_MESSAGES, 1);
 
         let mut headers = HashMap::new();
         headers.insert("1".to_string(), "1".to_string());
@@ -149,15 +145,19 @@ mod tests {
             attempt_no: 2,
         };
 
-        let mut builder =
-            DeliverTcpPacketBuilder::new("test_topic", "test_queue", 15, version.clone());
+        let mut builder = DeliverTcpPacketBuilder::new(
+            "test_topic",
+            "test_queue",
+            15,
+            metadata.get(NEW_MESSAGES),
+        );
 
         builder.append_packet(&msg1);
         builder.append_packet(&msg2);
 
         let tcp_contract = builder.get_result();
 
-        let result = convert_from_raw(tcp_contract, &version).await;
+        let result = convert_from_raw(tcp_contract, &metadata).await;
 
         if let TcpContract::NewMessages {
             topic_id,

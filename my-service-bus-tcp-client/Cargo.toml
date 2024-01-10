@@ -16,3 +16,4 @@ tokio = { version = "*", features = ["full"] }
 tokio-util = "*"
 chrono = "*"
 async-trait = "*"
+lazy_static = "*"

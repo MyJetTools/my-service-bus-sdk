@@ -13,7 +13,6 @@ use my_service_bus_abstractions::subscriber::Subscriber;
 use my_service_bus_abstractions::subscriber::SubscriberCallback;
 use my_service_bus_abstractions::subscriber::TopicQueueType;
 use my_service_bus_abstractions::GetMySbModelTopicId;
-use my_service_bus_tcp_shared::MySbTcpSerializer;
 use my_tcp_sockets::{TcpClient, TcpClientSocketSettings};
 use rust_extensions::{Logger, StrOrString};
 
@@ -70,14 +69,7 @@ impl MyServiceBusClient {
 
     pub async fn start(&self) {
         self.tcp_client
-            .start(
-                Arc::new(|| -> MySbTcpSerializer {
-                    let attrs = super::new_connection_handler::get_connection_attrs();
-                    MySbTcpSerializer::new(attrs)
-                }),
-                self.data.clone(),
-                self.data.logger.clone(),
-            )
+            .start(self.data.clone(), self.data.logger.clone())
             .await;
     }
 

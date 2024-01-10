@@ -1,6 +1,6 @@
 use std::sync::{atomic::AtomicBool, Arc};
 
-use my_service_bus_tcp_shared::MySbTcpSerializer;
+use my_service_bus_tcp_shared::{MySbSerializerMetadata, MySbTcpSerializer};
 use my_tcp_sockets::ConnectionEvent;
 use rust_extensions::{Logger, StrOrString};
 
@@ -23,6 +23,7 @@ impl TcpClientData {
             my_tcp_sockets::tcp_connection::TcpSocketConnection<
                 my_service_bus_tcp_shared::TcpContract,
                 MySbTcpSerializer,
+                MySbSerializerMetadata,
             >,
         >,
         contract: my_service_bus_tcp_shared::TcpContract,
@@ -47,14 +48,19 @@ impl TcpClientData {
 }
 
 #[async_trait::async_trait]
-impl my_tcp_sockets::SocketEventCallback<my_service_bus_tcp_shared::TcpContract, MySbTcpSerializer>
-    for TcpClientData
+impl
+    my_tcp_sockets::SocketEventCallback<
+        my_service_bus_tcp_shared::TcpContract,
+        MySbTcpSerializer,
+        MySbSerializerMetadata,
+    > for TcpClientData
 {
     async fn handle(
         &self,
         connection_event: ConnectionEvent<
             my_service_bus_tcp_shared::TcpContract,
             MySbTcpSerializer,
+            MySbSerializerMetadata,
         >,
     ) {
         match connection_event {

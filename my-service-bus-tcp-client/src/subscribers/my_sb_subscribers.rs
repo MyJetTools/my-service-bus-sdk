@@ -4,10 +4,12 @@ use my_service_bus_abstractions::{
     MySbMessage, MyServiceBusSubscriberClient, MyServiceBusSubscriberClientCallback,
 };
 
-use my_service_bus_tcp_shared::{MySbTcpSerializer, TcpContract};
+use my_service_bus_tcp_shared::{MySbSerializerMetadata, MySbTcpSerializer, TcpContract};
 
 use my_tcp_sockets::tcp_connection::TcpSocketConnection;
 use tokio::sync::Mutex;
+
+use crate::new_connection_handler::CLIENT_SERIALIZER_METADATA;
 
 use super::MySbSubscribersData;
 
@@ -69,7 +71,9 @@ impl MySbSubscribers {
 
     pub async fn new_connection(
         &self,
-        connection: Arc<TcpSocketConnection<TcpContract, MySbTcpSerializer>>,
+        connection: Arc<
+            TcpSocketConnection<TcpContract, MySbTcpSerializer, MySbSerializerMetadata>,
+        >,
     ) {
         {
             let mut write_access = self.subscribers.lock().await;
@@ -83,7 +87,7 @@ impl MySbSubscribers {
                 queue_type: subscriber.get_queue_type(),
             };
 
-            connection.send(&packet).await;
+            connection.send(&packet, &CLIENT_SERIALIZER_METADATA).await;
         }
     }
     pub async fn disconnect(&self) {
@@ -102,7 +106,9 @@ impl MySbSubscribers {
 
             if let Some(connection) = connection {
                 if connection.id == connection_id {
-                    connection.send(&mut tcp_contract).await;
+                    connection
+                        .send(&mut tcp_contract, &CLIENT_SERIALIZER_METADATA)
+                        .await;
                 }
             }
         });

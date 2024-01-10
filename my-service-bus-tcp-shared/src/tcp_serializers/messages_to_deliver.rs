@@ -5,14 +5,14 @@ use my_tcp_sockets::socket_reader::{ReadingTcpContractFail, SocketReader};
 use crate::PacketProtVer;
 
 pub fn serialize(dest: &mut Vec<u8>, msg: &impl MyServiceBusMessage, version: &PacketProtVer) {
-    if version.protocol_version < 3 {
+    if version.tcp_protocol_version.get_value() < 3 {
         serialize_v2(dest, msg, version.packet_version);
     } else {
         serialize_v3(dest, msg);
     }
 }
 
-pub fn serialize_v2(dest: &mut Vec<u8>, msg: &impl MyServiceBusMessage, packet_version: i32) {
+pub fn serialize_v2(dest: &mut Vec<u8>, msg: &impl MyServiceBusMessage, packet_version: u8) {
     crate::tcp_serializers::i64::serialize(dest, msg.get_id().get_value());
 
     if packet_version == 1 {
@@ -32,7 +32,7 @@ pub async fn deserialize<TSocketReader: SocketReader + Send + Sync + 'static>(
     socket_reader: &mut TSocketReader,
     version: &PacketProtVer,
 ) -> Result<MySbMessage, ReadingTcpContractFail> {
-    if version.protocol_version < 3 {
+    if version.tcp_protocol_version.get_value() < 3 {
         return deserialize_v2(socket_reader, version.packet_version).await;
     }
 
@@ -41,7 +41,7 @@ pub async fn deserialize<TSocketReader: SocketReader + Send + Sync + 'static>(
 
 pub async fn deserialize_v2<TSocketReader: SocketReader + Send + Sync + 'static>(
     socket_reader: &mut TSocketReader,
-    packet_version: i32,
+    packet_version: u8,
 ) -> Result<MySbMessage, ReadingTcpContractFail> {
     let id = socket_reader.read_i64().await?;
 
@@ -96,7 +96,7 @@ mod test {
     #[tokio::test]
     pub async fn test_v2() {
         let version = PacketProtVer {
-            protocol_version: 2,
+            tcp_protocol_version: 2i32.into(),
             packet_version: 1,
         };
 
@@ -128,7 +128,7 @@ mod test {
     #[tokio::test]
     pub async fn test_v3() {
         let version = PacketProtVer {
-            protocol_version: 3,
+            tcp_protocol_version: 3i32.into(),
             packet_version: 1,
         };
 

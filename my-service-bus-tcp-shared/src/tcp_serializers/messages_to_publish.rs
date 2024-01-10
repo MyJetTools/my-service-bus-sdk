@@ -1,12 +1,14 @@
 use my_service_bus_abstractions::publisher::MessageToPublish;
 use my_tcp_sockets::TcpWriteBuffer;
 
+use crate::TcpProtocolVersion;
+
 pub fn serialize(
     write_buffer: &mut impl TcpWriteBuffer,
     v: &[MessageToPublish],
-    protocol_version: i32,
+    protocol_version: TcpProtocolVersion,
 ) {
-    if protocol_version < 3 {
+    if protocol_version.get_value() < 3 {
         serialize_v2(write_buffer, v)
     } else {
         serialize_v3(write_buffer, v)

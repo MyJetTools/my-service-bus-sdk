@@ -3,9 +3,11 @@ use std::sync::Arc;
 use my_service_bus_abstractions::{
     publisher::MessageToPublish, MyServiceBusPublisherClient, PublishError,
 };
-use my_service_bus_tcp_shared::{MySbTcpSerializer, TcpContract};
+use my_service_bus_tcp_shared::{MySbSerializerMetadata, MySbTcpSerializer, TcpContract};
 use my_tcp_sockets::tcp_connection::TcpSocketConnection;
 use tokio::sync::Mutex;
+
+use crate::new_connection_handler::CLIENT_SERIALIZER_METADATA;
 
 use super::{MySbPublisherData, PublishProcessByConnection};
 
@@ -28,7 +30,9 @@ impl MySbPublishers {
 
     pub async fn new_connection(
         &self,
-        connection: Arc<TcpSocketConnection<TcpContract, MySbTcpSerializer>>,
+        connection: Arc<
+            TcpSocketConnection<TcpContract, MySbTcpSerializer, MySbSerializerMetadata>,
+        >,
     ) {
         {
             let mut write_access = self.data.lock().await;
@@ -37,7 +41,7 @@ impl MySbPublishers {
 
         for topic_id in self.get_topics_to_create().await {
             let packet = TcpContract::CreateTopicIfNotExists { topic_id };
-            connection.send(&packet).await;
+            connection.send(&packet, &CLIENT_SERIALIZER_METADATA).await;
         }
     }
 

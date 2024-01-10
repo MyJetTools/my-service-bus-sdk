@@ -5,7 +5,7 @@ pub mod byte;
 pub mod byte_array;
 pub mod i32;
 pub mod i64;
-pub mod legacy_long;
+//pub mod legacy_long;
 pub mod list_of_byte_arrays;
 pub mod message_headers;
 pub mod messages_to_deliver;

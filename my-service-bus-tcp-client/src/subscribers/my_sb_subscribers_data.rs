@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use my_service_bus_abstractions::MyServiceBusSubscriberClientCallback;
-use my_service_bus_tcp_shared::{MySbTcpSerializer, TcpContract};
+use my_service_bus_tcp_shared::{MySbSerializerMetadata, MySbTcpSerializer, TcpContract};
 use my_tcp_sockets::tcp_connection::TcpSocketConnection;
 
 pub struct MySbSubscribersData {
@@ -9,7 +9,8 @@ pub struct MySbSubscribersData {
         &'static str,
         HashMap<String, Arc<dyn MyServiceBusSubscriberClientCallback + Send + Sync + 'static>>,
     >,
-    pub connection: Option<Arc<TcpSocketConnection<TcpContract, MySbTcpSerializer>>>,
+    pub connection:
+        Option<Arc<TcpSocketConnection<TcpContract, MySbTcpSerializer, MySbSerializerMetadata>>>,
 }
 
 impl MySbSubscribersData {
