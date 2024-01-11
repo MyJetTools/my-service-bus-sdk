@@ -53,7 +53,16 @@ impl MySbSerializerMetadata {
 }
 
 impl TcpSerializationMetadata<TcpContract> for MySbSerializerMetadata {
-    const THERE_IS_METADATA: bool = true;
+    fn is_tcp_contract_related_to_metadata(&self, contract: &TcpContract) -> bool {
+        match contract {
+            TcpContract::Greeting {
+                name: _,
+                protocol_version: _,
+            } => true,
+            TcpContract::PacketVersions { packet_versions: _ } => true,
+            _ => false,
+        }
+    }
 
     fn apply_tcp_contract(&mut self, contract: &TcpContract) {
         match contract {

@@ -186,6 +186,7 @@ impl TcpContract {
 
                 let mut messages = Vec::with_capacity(records_len);
                 let version = serializer_metadata.get(packet_no);
+
                 for _ in 0..records_len {
                     let msg = crate::tcp_serializers::messages_to_deliver::deserialize(
                         socket_reader,
