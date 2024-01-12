@@ -53,3 +53,27 @@ impl SbMessageHeaders {
         self.headers.len()
     }
 }
+
+impl From<&[(String, String)]> for SbMessageHeaders {
+    fn from(src: &[(String, String)]) -> Self {
+        let mut result = Self::new();
+
+        for itm in src {
+            result = result.add(itm.0.to_string(), itm.1.to_string());
+        }
+
+        result
+    }
+}
+
+impl From<Vec<(String, String)>> for SbMessageHeaders {
+    fn from(src: Vec<(String, String)>) -> Self {
+        let mut result = Self::new();
+
+        for itm in src {
+            result = result.add(itm.0, itm.1);
+        }
+
+        result
+    }
+}
