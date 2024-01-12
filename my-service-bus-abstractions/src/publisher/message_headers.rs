@@ -16,7 +16,7 @@ impl SbMessageHeaders {
         }
     }
 
-    pub fn from(src: impl Iterator<Item = (String, String)>) -> Self {
+    pub fn from_iterator(src: impl Iterator<Item = (String, String)>) -> Self {
         let mut result = Self::new();
 
         for itm in src {
