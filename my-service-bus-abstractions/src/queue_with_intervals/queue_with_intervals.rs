@@ -326,6 +326,7 @@ impl QueueWithIntervals {
         self.intervals.clone()
     }
 
+    // Returns non - only if we did not put any messages into the queue never
     pub fn get_min_id(&self) -> Option<i64> {
         let result = self.intervals.get(0)?;
 
