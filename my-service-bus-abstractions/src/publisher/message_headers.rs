@@ -16,8 +16,15 @@ impl SbMessageHeaders {
         }
     }
 
-    pub fn from_iterator(src: impl Iterator<Item = (String, String)>) -> Self {
-        let mut result = Self::new();
+    pub fn from_iterator(
+        capacity: Option<usize>,
+        src: impl Iterator<Item = (String, String)>,
+    ) -> Self {
+        let mut result = if let Some(capacity) = capacity {
+            Self::with_capacity(capacity)
+        } else {
+            Self::new()
+        };
 
         for itm in src {
             result = result.add(itm.0, itm.1);
@@ -66,7 +73,7 @@ impl SbMessageHeaders {
 
 impl Into<SbMessageHeaders> for &'_ [(String, String)] {
     fn into(self) -> SbMessageHeaders {
-        let mut result = SbMessageHeaders::new();
+        let mut result = SbMessageHeaders::with_capacity(self.len());
 
         for itm in self {
             result = result.add(itm.0.to_string(), itm.1.to_string());
@@ -78,7 +85,7 @@ impl Into<SbMessageHeaders> for &'_ [(String, String)] {
 
 impl Into<SbMessageHeaders> for Vec<(String, String)> {
     fn into(self) -> SbMessageHeaders {
-        let mut result = SbMessageHeaders::new();
+        let mut result = SbMessageHeaders::with_capacity(self.len());
 
         for itm in self {
             result = result.add(itm.0, itm.1);
