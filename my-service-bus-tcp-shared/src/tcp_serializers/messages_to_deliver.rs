@@ -1,4 +1,4 @@
-use my_service_bus_abstractions::{MySbMessage, MyServiceBusMessage};
+use my_service_bus_abstractions::{publisher::SbMessageHeaders, MySbMessage, MyServiceBusMessage};
 
 use my_tcp_sockets::socket_reader::{ReadingTcpContractFail, SocketReader};
 
@@ -55,7 +55,7 @@ pub async fn deserialize_v2<TSocketReader: SocketReader + Send + Sync + 'static>
 
     let result = MySbMessage {
         id: id.into(),
-        headers: None,
+        headers: SbMessageHeaders::new(),
         attempt_no,
         content,
     };
@@ -86,9 +86,8 @@ pub async fn deserialize_v3<TSocketReader: SocketReader + Send + Sync + 'static>
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
 
-    use my_service_bus_abstractions::MySbMessage;
+    use my_service_bus_abstractions::{publisher::SbMessageHeaders, MySbMessage};
     use my_tcp_sockets::socket_reader::SocketReaderInMem;
 
     use crate::PacketProtVer;
@@ -100,13 +99,12 @@ mod test {
             packet_version: 1,
         };
 
-        let mut headers = HashMap::new();
-        headers.insert("key1".to_string(), "value1".to_string());
+        let headers = SbMessageHeaders::new().add("key1", "value1");
 
         let src_msg = MySbMessage {
             id: 1.into(),
             content: vec![0u8, 1u8, 2u8],
-            headers: Some(headers),
+            headers,
             attempt_no: 1,
         };
 
@@ -122,7 +120,7 @@ mod test {
 
         assert_eq!(src_msg.id, result.id);
         assert_eq!(src_msg.content, result.content);
-        assert_eq!(true, result.headers.is_none());
+        assert_eq!(0, result.headers.len());
     }
 
     #[tokio::test]
@@ -132,13 +130,12 @@ mod test {
             packet_version: 1,
         };
 
-        let mut headers = HashMap::new();
-        headers.insert("key1".to_string(), "value1".to_string());
+        let headers = SbMessageHeaders::new().add("key1", "value1");
 
         let src_msg = MySbMessage {
             id: 1.into(),
             content: vec![0u8, 1u8, 2u8],
-            headers: Some(headers),
+            headers,
             attempt_no: 1,
         };
 
@@ -155,9 +152,7 @@ mod test {
         assert_eq!(src_msg.id, result.id);
         assert_eq!(src_msg.content, result.content);
 
-        let headers = result.headers.unwrap();
-        assert_eq!(1, headers.len());
-
-        assert_eq!("value1", headers.get("key1").unwrap());
+        assert_eq!(1, result.headers.len());
+        assert_eq!("value1", result.headers.get("key1").unwrap());
     }
 }

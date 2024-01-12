@@ -50,9 +50,7 @@ impl DeliverTcpPacketBuilder {
 #[cfg(test)]
 mod tests {
 
-    use std::collections::HashMap;
-
-    use my_service_bus_abstractions::MySbMessage;
+    use my_service_bus_abstractions::{publisher::SbMessageHeaders, MySbMessage};
 
     use super::*;
     use crate::{tcp_message_id::NEW_MESSAGES, MySbSerializerMetadata, TcpContract};
@@ -62,21 +60,19 @@ mod tests {
         let mut metadata = MySbSerializerMetadata::new(2);
         metadata.versions.set_packet_version(NEW_MESSAGES, 1);
 
-        let mut headers = HashMap::new();
-        headers.insert("1".to_string(), "1".to_string());
-        headers.insert("2".to_string(), "2".to_string());
+        let headers = SbMessageHeaders::new().add("1", "1").add("2", "2");
 
         let msg1 = MySbMessage {
             id: 1.into(),
             content: vec![1, 1, 1],
-            headers: Some(headers),
+            headers,
             attempt_no: 1,
         };
 
         let msg2 = MySbMessage {
             id: 2.into(),
             content: vec![2, 2, 2],
-            headers: None,
+            headers: SbMessageHeaders::new(),
             attempt_no: 2,
         };
 
@@ -110,13 +106,13 @@ mod tests {
 
             assert_eq!(1, result_msg1.attempt_no);
             assert_eq!(msg1.content, result_msg1.content);
-            assert_eq!(true, result_msg1.headers.is_none());
+            assert_eq!(0, result_msg1.headers.len());
 
             let result_msg2 = messages.remove(0);
 
             assert_eq!(2, result_msg2.attempt_no);
             assert_eq!(msg2.content, result_msg2.content);
-            assert_eq!(true, result_msg2.headers.is_none());
+            assert_eq!(0, result_msg2.headers.len());
         } else {
             panic!("We should not be ere")
         }
@@ -127,21 +123,19 @@ mod tests {
         let mut metadata = MySbSerializerMetadata::new(3);
         metadata.versions.set_packet_version(NEW_MESSAGES, 1);
 
-        let mut headers = HashMap::new();
-        headers.insert("1".to_string(), "1".to_string());
-        headers.insert("2".to_string(), "2".to_string());
+        let headers = SbMessageHeaders::new().add("1", "1").add("2", "2");
 
         let msg1 = MySbMessage {
             id: 1.into(),
             content: vec![1, 1, 1],
-            headers: Some(headers),
+            headers,
             attempt_no: 1,
         };
 
         let msg2 = MySbMessage {
             id: 2.into(),
             content: vec![2, 2, 2],
-            headers: None,
+            headers: SbMessageHeaders::new(),
             attempt_no: 2,
         };
 
@@ -175,13 +169,13 @@ mod tests {
 
             assert_eq!(1, result_msg1.attempt_no);
             assert_eq!(msg1.content, result_msg1.content);
-            assert_eq!(2, result_msg1.headers.unwrap().len());
+            assert_eq!(2, result_msg1.headers.len());
 
             let result_msg2 = messages.remove(0);
 
             assert_eq!(2, result_msg2.attempt_no);
             assert_eq!(msg2.content, result_msg2.content);
-            assert_eq!(true, result_msg2.headers.is_none());
+            assert_eq!(0, result_msg2.headers.len());
         } else {
             panic!("We should not be ere")
         }

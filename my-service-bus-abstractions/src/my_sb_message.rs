@@ -1,11 +1,9 @@
-use std::collections::HashMap;
-
-use crate::MessageId;
+use crate::{publisher::SbMessageHeaders, MessageId};
 
 pub trait MyServiceBusMessage {
     fn get_id(&self) -> MessageId;
     fn get_attempt_no(&self) -> i32;
-    fn get_headers(&self) -> Option<&HashMap<String, String>>;
+    fn get_headers(&self) -> &SbMessageHeaders;
     fn get_content(&self) -> &[u8];
 }
 
@@ -13,7 +11,7 @@ pub trait MyServiceBusMessage {
 pub struct MySbMessage {
     pub id: MessageId,
     pub attempt_no: i32,
-    pub headers: Option<HashMap<String, String>>,
+    pub headers: SbMessageHeaders,
     pub content: Vec<u8>,
 }
 
@@ -26,8 +24,8 @@ impl MyServiceBusMessage for MySbMessage {
         self.attempt_no
     }
 
-    fn get_headers(&self) -> Option<&HashMap<String, String>> {
-        self.headers.as_ref()
+    fn get_headers(&self) -> &SbMessageHeaders {
+        &self.headers
     }
 
     fn get_content(&self) -> &[u8] {

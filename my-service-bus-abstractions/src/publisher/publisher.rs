@@ -6,7 +6,7 @@ use rust_extensions::Logger;
 
 use crate::{MyServiceBusPublisherClient, PublishError};
 
-use super::{MessageToPublish, MySbMessageSerializer};
+use super::{MessageToPublish, MySbMessageSerializer, SbMessageHeaders};
 
 pub struct MyServiceBusPublisher<TMessageModel: MySbMessageSerializer> {
     pub topic_id: String,
@@ -83,7 +83,7 @@ impl<TMessageModel: MySbMessageSerializer> MyServiceBusPublisher<TMessageModel> 
     pub async fn publish_with_headers(
         &self,
         message: &TMessageModel,
-        headers: HashMap<String, String>,
+        headers: SbMessageHeaders,
         #[cfg(feature = "with-telemetry")] telemetry_context: Option<&MyTelemetryContext>,
     ) -> Result<(), PublishError> {
         let content = message.serialize(Some(headers));
@@ -224,7 +224,7 @@ impl<TMessageModel: MySbMessageSerializer> MyServiceBusPublisher<TMessageModel> 
 
     pub async fn publish_messages_with_header(
         &self,
-        messages: Vec<(TMessageModel, Option<HashMap<String, String>>)>,
+        messages: Vec<(TMessageModel, Option<SbMessageHeaders>)>,
         #[cfg(feature = "with-telemetry")] telemetry_context: Option<&MyTelemetryContext>,
     ) -> Result<(), PublishError> {
         let mut messages_to_publish = Vec::with_capacity(messages.len());

@@ -1,5 +1,7 @@
 use my_service_bus_abstractions::{
-    publisher::MessageToPublish, queue_with_intervals::QueueIndexRange, subscriber::TopicQueueType,
+    publisher::{MessageToPublish, SbMessageHeaders},
+    queue_with_intervals::QueueIndexRange,
+    subscriber::TopicQueueType,
     MySbMessage,
 };
 use my_tcp_sockets::{
@@ -120,7 +122,7 @@ impl TcpContract {
                     for _ in 0..messages_count {
                         let content = socket_reader.read_byte_array().await?;
                         data_to_publish.push(MessageToPublish {
-                            headers: None,
+                            headers: SbMessageHeaders::new(),
                             content,
                         });
                     }
@@ -557,6 +559,7 @@ impl my_tcp_sockets::TcpContract for TcpContract {
 #[cfg(test)]
 mod tests {
 
+    use my_service_bus_abstractions::publisher::SbMessageHeaders;
     use my_tcp_sockets::socket_reader::SocketReaderInMem;
 
     use super::*;
@@ -653,7 +656,7 @@ mod tests {
 
         let message_to_publish = MessageToPublish {
             content: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0],
-            headers: None,
+            headers: SbMessageHeaders::new(),
         };
 
         let data_test = vec![message_to_publish];
@@ -707,13 +710,13 @@ mod tests {
 
         let request_id_test = 1;
 
-        let mut headers = HashMap::new();
-        headers.insert("key1".to_string(), "value1".to_string());
-        headers.insert("key2".to_string(), "value2".to_string());
+        let headers = SbMessageHeaders::new()
+            .add("key1", "value1")
+            .add("key2", "value2");
 
         let message_to_publish = MessageToPublish {
             content: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0],
-            headers: Some(headers),
+            headers,
         };
 
         let data_test = vec![message_to_publish];
@@ -754,7 +757,7 @@ mod tests {
 
                 let el0 = data_to_publish.remove(0);
 
-                let mut headers = el0.headers.unwrap();
+                let mut headers = el0.headers;
 
                 assert_eq!(data_test, el0.content);
                 assert_eq!(2, headers.len());

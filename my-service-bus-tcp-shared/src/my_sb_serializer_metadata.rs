@@ -79,3 +79,14 @@ impl TcpSerializationMetadata<TcpContract> for MySbSerializerMetadata {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+
+    #[test]
+    fn metadata() {
+        let a = std::mem::size_of::<super::MySbSerializerMetadata>();
+
+        println!("Size of metadata: {}", a);
+    }
+}

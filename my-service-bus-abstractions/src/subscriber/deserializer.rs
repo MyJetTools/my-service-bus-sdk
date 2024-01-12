@@ -1,11 +1,6 @@
-use std::collections::HashMap;
-
-use crate::SubscriberError;
+use crate::{publisher::SbMessageHeaders, SubscriberError};
 
 pub trait MySbMessageDeserializer {
     type Item;
-    fn deserialize(
-        src: &[u8],
-        headers: &Option<HashMap<String, String>>,
-    ) -> Result<Self::Item, SubscriberError>;
+    fn deserialize(src: &[u8], headers: &SbMessageHeaders) -> Result<Self::Item, SubscriberError>;
 }

@@ -31,7 +31,7 @@ pub fn serialize_v3(write_buffer: &mut impl TcpWriteBuffer, v: &[MessageToPublis
     //super::i32::serialize(data, array_len);
 
     for item in v {
-        super::message_headers::serialize(write_buffer, item.headers.as_ref());
+        super::message_headers::serialize(write_buffer, &item.headers);
         write_buffer.write_byte_array(&item.content);
         //super::byte_array::serialize(data, &item.content);
     }

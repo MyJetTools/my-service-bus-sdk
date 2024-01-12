@@ -1,15 +1,13 @@
-use std::collections::HashMap;
-
 #[cfg(feature = "with-telemetry")]
 use super::DeliveredMessageTelemetry;
-use crate::MessageId;
+use crate::{publisher::SbMessageHeaders, MessageId};
 
 use super::MySbMessageDeserializer;
 
 pub struct MySbDeliveredMessage<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> {
     pub id: MessageId,
     pub attempt_no: i32,
-    pub headers: Option<HashMap<String, String>>,
+    pub headers: SbMessageHeaders,
     pub raw: Vec<u8>,
     pub content: Option<TMessageModel>,
     #[cfg(feature = "with-telemetry")]
