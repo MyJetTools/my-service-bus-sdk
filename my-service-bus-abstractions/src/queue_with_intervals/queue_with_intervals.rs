@@ -327,13 +327,14 @@ impl QueueWithIntervals {
     }
 
     pub fn get_min_id(&self) -> Option<i64> {
-        if self.len() == 0 {
+        let result = self.intervals.get(0)?;
+
+        let result = result.from_id;
+        if result < 0 {
             return None;
         }
 
-        let result = self.intervals.get(0)?;
-
-        Some(result.from_id)
+        Some(result)
     }
 
     pub fn get_max_id(&self) -> Option<i64> {
