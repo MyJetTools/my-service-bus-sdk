@@ -16,6 +16,16 @@ impl SbMessageHeaders {
         }
     }
 
+    pub fn from(src: impl Iterator<Item = (String, String)>) -> Self {
+        let mut result = Self::new();
+
+        for itm in src {
+            result = result.add(itm.0, itm.1);
+        }
+
+        result
+    }
+
     pub fn add<'k, 'v>(
         mut self,
         key: impl Into<StrOrString<'k>>,
@@ -54,11 +64,11 @@ impl SbMessageHeaders {
     }
 }
 
-impl From<&[(String, String)]> for SbMessageHeaders {
-    fn from(src: &[(String, String)]) -> Self {
-        let mut result = Self::new();
+impl Into<SbMessageHeaders> for &'_ [(String, String)] {
+    fn into(self) -> SbMessageHeaders {
+        let mut result = SbMessageHeaders::new();
 
-        for itm in src {
+        for itm in self {
             result = result.add(itm.0.to_string(), itm.1.to_string());
         }
 
@@ -66,11 +76,11 @@ impl From<&[(String, String)]> for SbMessageHeaders {
     }
 }
 
-impl From<Vec<(String, String)>> for SbMessageHeaders {
-    fn from(src: Vec<(String, String)>) -> Self {
-        let mut result = Self::new();
+impl Into<SbMessageHeaders> for Vec<(String, String)> {
+    fn into(self) -> SbMessageHeaders {
+        let mut result = SbMessageHeaders::new();
 
-        for itm in src {
+        for itm in self {
             result = result.add(itm.0, itm.1);
         }
 
