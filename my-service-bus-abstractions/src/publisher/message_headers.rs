@@ -44,6 +44,16 @@ impl SbMessageHeaders {
         self
     }
 
+    pub fn add_header<'k, 'v>(
+        &mut self,
+        key: impl Into<StrOrString<'k>>,
+        value: impl Into<StrOrString<'v>>,
+    ) {
+        let key: StrOrString<'k> = key.into();
+        let value: StrOrString<'v> = value.into();
+        self.headers.push((key.to_string(), value.to_string()));
+    }
+
     pub fn get(&self, key: &str) -> Option<&str> {
         for itm in self.headers.iter() {
             if itm.0 == key {

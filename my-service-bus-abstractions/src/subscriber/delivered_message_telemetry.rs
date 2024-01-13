@@ -1,9 +1,7 @@
-use std::collections::HashMap;
-
 use my_telemetry::{EventDurationTracker, MyTelemetryContext};
 use rust_extensions::StrOrString;
 
-use crate::MessageId;
+use crate::{publisher::SbMessageHeaders, MessageId};
 
 pub struct DeliveredMessageTelemetry {
     telemetry_event_name: Option<String>,
@@ -18,15 +16,12 @@ impl DeliveredMessageTelemetry {
         topic_id: &str,
         queue_id: &str,
         message_id: MessageId,
-        headers: &Option<HashMap<String, String>>,
+        headers: &SbMessageHeaders,
     ) -> Self {
         use crate::MY_TELEMETRY_HEADER;
         let telemetry_event_name = format!("Handling event {}/{}", topic_id, queue_id,);
-        if headers.is_none() {
-            return Self::create_brand_new_telemetry(message_id, telemetry_event_name);
-        }
 
-        if let Some(telemetry_value) = headers.as_ref().unwrap().get(MY_TELEMETRY_HEADER) {
+        if let Some(telemetry_value) = headers.get(MY_TELEMETRY_HEADER) {
             if let Ok(ctx) = MyTelemetryContext::parse_from_string(telemetry_value) {
                 return Self {
                     ctx,

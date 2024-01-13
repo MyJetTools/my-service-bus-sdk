@@ -1,16 +1,9 @@
-use std::collections::HashMap;
-
 use my_telemetry::MyTelemetryContext;
 
-pub fn apply_publish_telemetry(
-    headers: &mut Option<HashMap<String, String>>,
-    my_telemetry: &MyTelemetryContext,
-) {
-    if headers.is_none() {
-        *headers = Some(HashMap::new());
-    }
+use super::SbMessageHeaders;
 
-    headers.as_mut().unwrap().insert(
+pub fn apply_publish_telemetry(headers: &mut SbMessageHeaders, my_telemetry: &MyTelemetryContext) {
+    headers.add_header(
         crate::MY_TELEMETRY_HEADER.to_string(),
         my_telemetry.as_string(),
     );

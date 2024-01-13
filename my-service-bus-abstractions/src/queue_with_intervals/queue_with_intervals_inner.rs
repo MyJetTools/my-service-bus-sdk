@@ -67,8 +67,8 @@ impl QueueWithIntervalsInner {
             return (Some(&self.first), self.additional.get(0));
         }
         return (
-            self.additional.get(first_index -1),
-            self.additional.get(first_index ),
+            self.additional.get(first_index - 1),
+            self.additional.get(first_index),
         );
     }
 
