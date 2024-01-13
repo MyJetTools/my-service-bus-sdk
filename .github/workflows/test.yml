@@ -19,3 +19,4 @@ jobs:
       - name: Test Build      
         run: |
           cargo test
+          cargo test --features with-telemetry
