@@ -2,7 +2,7 @@ use crate::queue_with_intervals::queue_index_range::{QueueIndexRange, RemoveResu
 
 use super::{
     iterator::QueueWithIntervalsIterator, queue_index_range::QueueIndexRangeCompare,
-    QueueWithIntervalsInner,
+    QueueWithIntervalsInner, QueueWithIntervalsInnerIterator,
 };
 
 #[derive(Debug, Clone)]
@@ -425,6 +425,10 @@ impl QueueWithIntervals {
 
     pub fn get_interval(&self, index: usize) -> Option<&QueueIndexRange> {
         self.inner.get(index)
+    }
+
+    pub fn iterate_intervals(&self) -> QueueWithIntervalsInnerIterator {
+        QueueWithIntervalsInnerIterator::new(&self.inner)
     }
 }
 
