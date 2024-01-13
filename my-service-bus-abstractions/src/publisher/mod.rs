@@ -9,5 +9,3 @@ pub use message_to_publish::*;
 pub use publisher::*;
 pub use serializer::*;
 pub use with_internal_queue::*;
-mod message_headers;
-pub use message_headers::*;

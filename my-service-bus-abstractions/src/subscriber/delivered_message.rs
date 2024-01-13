@@ -1,6 +1,6 @@
 #[cfg(feature = "with-telemetry")]
 use super::DeliveredMessageTelemetry;
-use crate::{publisher::SbMessageHeaders, MessageId};
+use crate::{MessageId, SbMessageHeaders};
 
 use super::MySbMessageDeserializer;
 

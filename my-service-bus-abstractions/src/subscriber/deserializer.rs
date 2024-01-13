@@ -1,4 +1,4 @@
-use crate::{publisher::SbMessageHeaders, SubscriberError};
+use crate::{SbMessageHeaders, SubscriberError};
 
 pub trait MySbMessageDeserializer {
     type Item;

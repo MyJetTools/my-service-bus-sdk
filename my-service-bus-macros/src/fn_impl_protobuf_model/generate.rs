@@ -32,8 +32,8 @@ pub fn generate(attr: TokenStream, input: TokenStream) -> Result<proc_macro::Tok
 
             fn serialize(
                 &self,
-                headers: Option<std::collections::HashMap<String, String>>,
-            ) -> Result<(Vec<u8>, Option<std::collections::HashMap<String, String>>), String> {
+                headers: my_service_bus_abstractions::SbMessageHeaders,
+            ) -> Result<(Vec<u8>, my_service_bus_abstractions::SbMessageHeaders), String> {
                 match self.as_protobuf_bytes() {
                     Ok(result) => Ok((result, headers)),
                     Err(err) => Err(format!("Error serializing protobuf: {}", err)),

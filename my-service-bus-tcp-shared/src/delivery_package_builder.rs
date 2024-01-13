@@ -50,7 +50,7 @@ impl DeliverTcpPacketBuilder {
 #[cfg(test)]
 mod tests {
 
-    use my_service_bus_abstractions::{publisher::SbMessageHeaders, MySbMessage};
+    use my_service_bus_abstractions::{MySbMessage, SbMessageHeaders};
 
     use super::*;
     use crate::{tcp_message_id::NEW_MESSAGES, MySbSerializerMetadata, TcpContract};

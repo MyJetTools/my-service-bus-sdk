@@ -1,4 +1,4 @@
-use my_service_bus_abstractions::publisher::SbMessageHeaders;
+use my_service_bus_abstractions::SbMessageHeaders;
 use my_tcp_sockets::{
     socket_reader::{ReadingTcpContractFail, SocketReader},
     TcpWriteBuffer,
@@ -61,7 +61,7 @@ pub fn serialize(write_buffer: &mut impl TcpWriteBuffer, headers: &SbMessageHead
 #[cfg(test)]
 mod test {
 
-    use my_service_bus_abstractions::publisher::SbMessageHeaders;
+    use my_service_bus_abstractions::SbMessageHeaders;
     use my_tcp_sockets::socket_reader::SocketReaderInMem;
 
     #[tokio::test]

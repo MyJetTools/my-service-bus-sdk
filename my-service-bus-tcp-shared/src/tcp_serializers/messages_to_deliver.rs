@@ -1,4 +1,4 @@
-use my_service_bus_abstractions::{publisher::SbMessageHeaders, MySbMessage, MyServiceBusMessage};
+use my_service_bus_abstractions::{MySbMessage, MyServiceBusMessage, SbMessageHeaders};
 
 use my_tcp_sockets::socket_reader::{ReadingTcpContractFail, SocketReader};
 
@@ -87,7 +87,7 @@ pub async fn deserialize_v3<TSocketReader: SocketReader + Send + Sync + 'static>
 #[cfg(test)]
 mod test {
 
-    use my_service_bus_abstractions::{publisher::SbMessageHeaders, MySbMessage};
+    use my_service_bus_abstractions::{MySbMessage, SbMessageHeaders};
     use my_tcp_sockets::socket_reader::SocketReaderInMem;
 
     use crate::PacketProtVer;

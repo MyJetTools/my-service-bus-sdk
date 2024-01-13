@@ -1,8 +1,6 @@
-use super::SbMessageHeaders;
-
 pub trait MySbMessageSerializer {
     fn serialize(
         &self,
-        headers: Option<SbMessageHeaders>,
-    ) -> Result<(Vec<u8>, SbMessageHeaders), String>;
+        headers: Option<crate::SbMessageHeaders>,
+    ) -> Result<(Vec<u8>, crate::SbMessageHeaders), String>;
 }

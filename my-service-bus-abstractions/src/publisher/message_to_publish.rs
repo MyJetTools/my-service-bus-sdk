@@ -1,4 +1,4 @@
-use super::SbMessageHeaders;
+use crate::SbMessageHeaders;
 
 #[derive(Debug, Clone)]
 pub struct MessageToPublish {

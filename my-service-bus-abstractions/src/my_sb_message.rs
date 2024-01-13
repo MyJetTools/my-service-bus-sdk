@@ -1,4 +1,4 @@
-use crate::{publisher::SbMessageHeaders, MessageId};
+use crate::{MessageId, SbMessageHeaders};
 
 pub trait MyServiceBusMessage {
     fn get_id(&self) -> MessageId;

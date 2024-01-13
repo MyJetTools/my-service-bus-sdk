@@ -1,8 +1,6 @@
 use my_service_bus_abstractions::{
-    publisher::{MessageToPublish, SbMessageHeaders},
-    queue_with_intervals::QueueIndexRange,
-    subscriber::TopicQueueType,
-    MySbMessage,
+    publisher::MessageToPublish, queue_with_intervals::QueueIndexRange, subscriber::TopicQueueType,
+    MySbMessage, SbMessageHeaders,
 };
 use my_tcp_sockets::{
     socket_reader::{ReadingTcpContractFail, SocketReader},
@@ -559,7 +557,7 @@ impl my_tcp_sockets::TcpContract for TcpContract {
 #[cfg(test)]
 mod tests {
 
-    use my_service_bus_abstractions::publisher::SbMessageHeaders;
+    use my_service_bus_abstractions::SbMessageHeaders;
     use my_tcp_sockets::socket_reader::SocketReaderInMem;
 
     use super::*;
