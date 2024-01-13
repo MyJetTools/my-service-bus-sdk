@@ -32,8 +32,14 @@ pub fn generate(attr: TokenStream, input: TokenStream) -> Result<proc_macro::Tok
 
             fn serialize(
                 &self,
-                headers: my_service_bus::abstractions::SbMessageHeaders,
+                headers: Option<my_service_bus::abstractions::SbMessageHeaders>,
             ) -> Result<(Vec<u8>, my_service_bus::abstractions::SbMessageHeaders), String> {
+                
+                let headers = match headers {
+                    Some(headers) => headers,
+                    None => my_service_bus::abstractions::SbMessageHeaders::new(),
+                };
+
                 match self.as_protobuf_bytes() {
                     Ok(result) => Ok((result, headers)),
                     Err(err) => Err(format!("Error serializing protobuf: {}", err)),
