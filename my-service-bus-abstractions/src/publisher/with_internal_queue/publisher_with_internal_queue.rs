@@ -8,12 +8,9 @@ use tokio::sync::{
     Mutex,
 };
 
-use crate::{MyServiceBusPublisherClient, PublishError};
+use crate::{MySbMessageSerializer, MyServiceBusPublisherClient, PublishError};
 
-use super::{
-    super::{MessageToPublish, MySbMessageSerializer},
-    PublisherWithInternalQueueData, QueueToPublish,
-};
+use super::{super::MessageToPublish, PublisherWithInternalQueueData, QueueToPublish};
 
 pub struct PublisherWithInternalQueue<TMessageModel: MySbMessageSerializer> {
     data: Arc<PublisherWithInternalQueueData>,

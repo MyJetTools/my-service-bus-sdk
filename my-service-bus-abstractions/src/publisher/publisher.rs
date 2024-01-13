@@ -4,9 +4,9 @@ use std::{collections::HashMap, sync::Arc};
 use my_telemetry::MyTelemetryContext;
 use rust_extensions::Logger;
 
-use crate::{MyServiceBusPublisherClient, PublishError, SbMessageHeaders};
+use crate::{MySbMessageSerializer, MyServiceBusPublisherClient, PublishError, SbMessageHeaders};
 
-use super::{MessageToPublish, MySbMessageSerializer};
+use super::MessageToPublish;
 
 pub struct MyServiceBusPublisher<TMessageModel: MySbMessageSerializer> {
     pub topic_id: String,

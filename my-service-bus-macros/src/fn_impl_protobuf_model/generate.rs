@@ -28,12 +28,12 @@ pub fn generate(attr: TokenStream, input: TokenStream) -> Result<proc_macro::Tok
 
         }
 
-        impl my_service_bus::abstractions::publisher::MySbMessageSerializer for #struct_name{
+        impl my_service_bus::abstractions::MySbMessageSerializer for #struct_name{
 
             fn serialize(
                 &self,
-                headers: my_service_bus_abstractions::SbMessageHeaders,
-            ) -> Result<(Vec<u8>, my_service_bus_abstractions::SbMessageHeaders), String> {
+                headers: my_service_bus::abstractions::SbMessageHeaders,
+            ) -> Result<(Vec<u8>, my_service_bus::abstractions::SbMessageHeaders), String> {
                 match self.as_protobuf_bytes() {
                     Ok(result) => Ok((result, headers)),
                     Err(err) => Err(format!("Error serializing protobuf: {}", err)),

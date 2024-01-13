@@ -5,14 +5,12 @@ use crate::publishers::MySbPublishers;
 use crate::subscribers::MySbSubscribers;
 
 use crate::TcpClientData;
-use my_service_bus_abstractions::publisher::{
-    MySbMessageSerializer, MyServiceBusPublisher, PublisherWithInternalQueue,
-};
+use my_service_bus_abstractions::publisher::{MyServiceBusPublisher, PublisherWithInternalQueue};
 use my_service_bus_abstractions::subscriber::MySbMessageDeserializer;
 use my_service_bus_abstractions::subscriber::Subscriber;
 use my_service_bus_abstractions::subscriber::SubscriberCallback;
 use my_service_bus_abstractions::subscriber::TopicQueueType;
-use my_service_bus_abstractions::GetMySbModelTopicId;
+use my_service_bus_abstractions::{GetMySbModelTopicId, MySbMessageSerializer};
 use my_tcp_sockets::{TcpClient, TcpClientSocketSettings};
 use rust_extensions::{Logger, StrOrString};
 

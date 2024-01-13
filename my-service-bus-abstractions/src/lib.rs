@@ -11,3 +11,5 @@ pub use message_id::*;
 pub use my_sb_message::*;
 mod message_headers;
 pub use message_headers::*;
+mod serializer;
+pub use serializer::*;
