@@ -329,10 +329,6 @@ impl QueueWithIntervals {
         self.inner.get_min_id()
     }
 
-    pub fn get_min_id_even_if_empty(&self) -> Option<i64> {
-        self.inner.get_min_id_even_if_empty()
-    }
-
     pub fn get_max_id(&self) -> Option<i64> {
         self.inner.get_max_id()
     }

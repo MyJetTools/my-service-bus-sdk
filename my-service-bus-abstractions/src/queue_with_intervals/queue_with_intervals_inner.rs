@@ -232,14 +232,6 @@ impl QueueWithIntervalsInner {
         Some(self.first.from_id)
     }
 
-    pub fn get_min_id_even_if_empty(&self) -> Option<i64> {
-        if self.first.from_id < 0 {
-            return None;
-        }
-
-        Some(self.first.from_id)
-    }
-
     pub fn get_max_id(&self) -> Option<i64> {
         if self.first.is_empty() {
             return None;
