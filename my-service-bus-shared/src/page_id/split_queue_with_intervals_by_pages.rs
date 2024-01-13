@@ -15,7 +15,7 @@ pub struct SplittedByPageIdIterator {
 impl SplittedByPageIdIterator {
     pub fn new(src: &QueueWithIntervals) -> Self {
         Self {
-            intervals: src.intervals.clone(),
+            intervals: src.get_snapshot(),
             index: 0,
         }
     }
@@ -52,7 +52,7 @@ impl Iterator for SplittedByPageIdIterator {
             if to_page_id.get_value() > page_id.get_value() {
                 let to_id = page_id.get_last_message_id();
 
-                ids.intervals.push(QueueIndexRange {
+                ids.push_interval(QueueIndexRange {
                     from_id: el.from_id,
                     to_id: to_id.get_value(),
                 });
@@ -62,7 +62,7 @@ impl Iterator for SplittedByPageIdIterator {
                 return Some(SplittedByPageId { page_id, ids });
             }
 
-            ids.intervals.push(QueueIndexRange {
+            ids.push_interval(QueueIndexRange {
                 from_id: el.from_id,
                 to_id: el.to_id,
             });
@@ -90,8 +90,8 @@ mod tests {
         assert_eq!(1, result.len());
         assert_eq!(0, result[0].page_id.get_value());
 
-        assert_eq!(100, result[0].ids.intervals[0].from_id);
-        assert_eq!(200, result[0].ids.intervals[0].to_id);
+        assert_eq!(100, result[0].ids.get_interval(0).unwrap().from_id);
+        assert_eq!(200, result[0].ids.get_interval(0).unwrap().to_id);
     }
 
     #[test]
@@ -104,23 +104,23 @@ mod tests {
         assert_eq!(0, result[0].page_id.get_value());
         assert_eq!(1, result[1].page_id.get_value());
 
-        assert_eq!(99998, result[0].ids.intervals[0].from_id);
-        assert_eq!(99999, result[0].ids.intervals[0].to_id);
+        assert_eq!(99998, result[0].ids.get_interval(0).unwrap().from_id);
+        assert_eq!(99999, result[0].ids.get_interval(0).unwrap().to_id);
 
-        assert_eq!(100000, result[1].ids.intervals[0].from_id);
-        assert_eq!(100002, result[1].ids.intervals[0].to_id);
+        assert_eq!(100000, result[1].ids.get_interval(0).unwrap().from_id);
+        assert_eq!(100002, result[1].ids.get_interval(0).unwrap().to_id);
     }
 
     #[test]
     fn test_we_are_jumping_behind_the_page_2() {
         let mut src = QueueWithIntervals::from_single_interval(99_998, 100_002);
 
-        src.intervals.push(QueueIndexRange {
+        src.push_interval(QueueIndexRange {
             from_id: 100_010,
             to_id: 100_020,
         });
 
-        src.intervals.push(QueueIndexRange {
+        src.push_interval(QueueIndexRange {
             from_id: 199_990,
             to_id: 200_020,
         });
@@ -132,19 +132,19 @@ mod tests {
         assert_eq!(1, result[1].page_id.get_value());
         assert_eq!(2, result[2].page_id.get_value());
 
-        assert_eq!(99_998, result[0].ids.intervals[0].from_id);
-        assert_eq!(99_999, result[0].ids.intervals[0].to_id);
+        assert_eq!(99_998, result[0].ids.get_interval(0).unwrap().from_id);
+        assert_eq!(99_999, result[0].ids.get_interval(0).unwrap().to_id);
 
-        assert_eq!(100_000, result[1].ids.intervals[0].from_id);
-        assert_eq!(100_002, result[1].ids.intervals[0].to_id);
+        assert_eq!(100_000, result[1].ids.get_interval(0).unwrap().from_id);
+        assert_eq!(100_002, result[1].ids.get_interval(0).unwrap().to_id);
 
-        assert_eq!(100_010, result[1].ids.intervals[1].from_id);
-        assert_eq!(100_020, result[1].ids.intervals[1].to_id);
+        assert_eq!(100_010, result[1].ids.get_interval(1).unwrap().from_id);
+        assert_eq!(100_020, result[1].ids.get_interval(1).unwrap().to_id);
 
-        assert_eq!(199_990, result[1].ids.intervals[2].from_id);
-        assert_eq!(199_999, result[1].ids.intervals[2].to_id);
+        assert_eq!(199_990, result[1].ids.get_interval(2).unwrap().from_id);
+        assert_eq!(199_999, result[1].ids.get_interval(2).unwrap().to_id);
 
-        assert_eq!(200_000, result[2].ids.intervals[0].from_id);
-        assert_eq!(200_020, result[2].ids.intervals[0].to_id);
+        assert_eq!(200_000, result[2].ids.get_interval(0).unwrap().from_id);
+        assert_eq!(200_020, result[2].ids.get_interval(0).unwrap().to_id);
     }
 }

@@ -36,7 +36,8 @@ impl QueueIndexRange {
         }
     }
 
-    pub fn try_join_with_the_next_one(&mut self, next_one: QueueIndexRange) -> bool {
+    /*
+    pub fn try_join_with_the_next_one(&mut self, next_one: &QueueIndexRange) -> bool {
         if self.to_id + 1 == next_one.from_id {
             self.to_id = next_one.to_id;
             return true;
@@ -44,6 +45,8 @@ impl QueueIndexRange {
 
         return false;
     }
+
+     */
 
     pub fn is_in_my_interval(&self, id: i64)->bool{
         id >= self.from_id && id <= self.to_id
@@ -67,7 +70,7 @@ impl QueueIndexRange {
         id >= self.from_id && id <= self.to_id
     }
 
-    pub fn init(&mut self) {
+    pub fn reset(&mut self) {
         self.to_id = self.from_id - 1;
     }
 
@@ -144,13 +147,16 @@ impl QueueIndexRange {
         }
     }
 
-    pub fn try_merge_next(&mut self, next_item: &QueueIndexRange) -> bool {
+    pub fn try_to_merge_with_next_item(&self, next_item: &QueueIndexRange) -> Option<QueueIndexRange> {
         if self.to_id + 1 == next_item.from_id {
-            self.to_id = next_item.to_id;
-            return true;
+            return QueueIndexRange{
+                from_id: self.from_id,
+                to_id: next_item.to_id
+
+            }.into();
         }
 
-        return false;
+        None
     }
 
     pub fn try_join(&mut self, id_to_join: i64) -> bool {
@@ -194,6 +200,10 @@ impl QueueIndexRange {
         }
 
         return Some(QueueIndexRangeCompare::Inside);
+    }
+
+    pub fn covered_with_range_to_insert(&self, range_to_insert: &QueueIndexRange)->bool{
+        range_to_insert.from_id <= self.from_id && range_to_insert.to_id >= self.to_id 
     }
 
 

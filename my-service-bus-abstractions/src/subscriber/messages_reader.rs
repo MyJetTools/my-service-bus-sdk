@@ -12,7 +12,7 @@ use super::{CurrentMessage, SubscriberData};
 
 pub struct MessagesReader<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> {
     pub data: Arc<SubscriberData>,
-    total_messages_amount: i64,
+    total_messages_amount: usize,
     messages: Option<VecDeque<MySbDeliveredMessage<TMessageModel>>>,
     pub confirmation_id: i64,
     delivered: QueueWithIntervals,
@@ -27,7 +27,7 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
         confirmation_id: i64,
         connection_id: i32,
     ) -> Self {
-        let total_messages_amount = messages.len() as i64;
+        let total_messages_amount = messages.len();
         Self {
             data,
             messages: Some(messages),
@@ -86,7 +86,7 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> Drop
     for MessagesReader<TMessageModel>
 {
     fn drop(&mut self) {
-        if self.delivered.len() == self.total_messages_amount {
+        if self.delivered.queue_size() == self.total_messages_amount {
             self.data.client.confirm_delivery(
                 self.data.topic_id.as_str(),
                 self.data.queue_id.as_str(),
@@ -94,7 +94,7 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> Drop
                 self.connection_id,
                 true,
             );
-        } else if self.delivered.len() == 0 {
+        } else if self.delivered.queue_size() == 0 {
             let mut log_context = HashMap::new();
             log_context.insert(
                 "ConfirmationId".to_string(),
@@ -143,7 +143,7 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> Drop
                 "Sending delivery confirmation".to_string(),
                 format!(
                     "{} messages out of {} confirmed as Delivered",
-                    self.delivered.len(),
+                    self.delivered.queue_size(),
                     self.total_messages_amount
                 ),
                 Some(log_context),
