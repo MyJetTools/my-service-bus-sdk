@@ -1,7 +1,7 @@
 use my_telemetry::{EventDurationTracker, MyTelemetryContext};
 use rust_extensions::StrOrString;
 
-use crate::{publisher::SbMessageHeaders, MessageId};
+use crate::{MessageId, SbMessageHeaders};
 
 pub struct DeliveredMessageTelemetry {
     telemetry_event_name: Option<String>,

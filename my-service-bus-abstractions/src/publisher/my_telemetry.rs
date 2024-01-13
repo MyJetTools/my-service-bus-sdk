@@ -1,6 +1,6 @@
 use my_telemetry::MyTelemetryContext;
 
-use super::SbMessageHeaders;
+use crate::SbMessageHeaders;
 
 pub fn apply_publish_telemetry(headers: &mut SbMessageHeaders, my_telemetry: &MyTelemetryContext) {
     headers.add_header(
