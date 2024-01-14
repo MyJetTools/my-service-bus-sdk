@@ -2,6 +2,6 @@
 members = [
     "my-service-bus-abstractions",
     "my-service-bus-shared",
-    "my-service-bus-tcp-client",
+    #"my-service-bus-tcp-client",
     "my-service-bus",
 ]
