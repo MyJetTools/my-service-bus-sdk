@@ -89,7 +89,7 @@ pub enum TcpContract {
 impl TcpContract {
     pub async fn deserialize<TSocketReader: SocketReader + Send + Sync + 'static>(
         socket_reader: &mut TSocketReader,
-        serializer_metadata: &MySbSerializerMetadata,
+        serializer_metadata: Option<&MySbSerializerMetadata>,
     ) -> Result<TcpContract, ReadingTcpContractFail> {
         let packet_no = socket_reader.read_byte().await?;
 
@@ -116,7 +116,12 @@ impl TcpContract {
 
                 let mut data_to_publish: Vec<MessageToPublish> = Vec::with_capacity(messages_count);
 
-                if serializer_metadata.tcp_protocol_version.get_value() < 3 {
+                if serializer_metadata
+                    .unwrap()
+                    .tcp_protocol_version
+                    .get_value()
+                    < 3
+                {
                     for _ in 0..messages_count {
                         let content = socket_reader.read_byte_array().await?;
                         data_to_publish.push(MessageToPublish {
@@ -185,7 +190,7 @@ impl TcpContract {
                 let records_len = socket_reader.read_i32().await? as usize;
 
                 let mut messages = Vec::with_capacity(records_len);
-                let version = serializer_metadata.get(packet_no);
+                let version = serializer_metadata.unwrap().get(packet_no);
 
                 for _ in 0..records_len {
                     let msg = crate::tcp_serializers::messages_to_deliver::deserialize(
@@ -574,7 +579,7 @@ mod tests {
         let mut socket_reader = SocketReaderInMem::new(serialized_data);
         let attr = MySbSerializerMetadata::new(0);
 
-        let result = TcpContract::deserialize(&mut socket_reader, &attr)
+        let result = TcpContract::deserialize(&mut socket_reader, Some(&attr))
             .await
             .unwrap();
 
@@ -598,7 +603,7 @@ mod tests {
         let mut socket_reader = SocketReaderInMem::new(serialized_data);
         let attr = MySbSerializerMetadata::new(0);
 
-        let result = TcpContract::deserialize(&mut socket_reader, &attr)
+        let result = TcpContract::deserialize(&mut socket_reader, Some(&attr))
             .await
             .unwrap();
 
@@ -628,7 +633,7 @@ mod tests {
 
         let attr = MySbSerializerMetadata::new(0);
 
-        let result = TcpContract::deserialize(&mut socket_reader, &attr)
+        let result = TcpContract::deserialize(&mut socket_reader, Some(&attr))
             .await
             .unwrap();
 
@@ -675,7 +680,7 @@ mod tests {
 
         let mut socket_reader = SocketReaderInMem::new(serialized_data);
 
-        let result = TcpContract::deserialize(&mut socket_reader, &attr)
+        let result = TcpContract::deserialize(&mut socket_reader, Some(&attr))
             .await
             .unwrap();
 
@@ -734,7 +739,7 @@ mod tests {
 
         let mut socket_reader = SocketReaderInMem::new(serialized_data);
 
-        let result = TcpContract::deserialize(&mut socket_reader, &attr)
+        let result = TcpContract::deserialize(&mut socket_reader, Some(&attr))
             .await
             .unwrap();
 
@@ -786,7 +791,7 @@ mod tests {
 
         let mut socket_reader = SocketReaderInMem::new(serialized_data);
 
-        let result = TcpContract::deserialize(&mut socket_reader, &attr)
+        let result = TcpContract::deserialize(&mut socket_reader, Some(&attr))
             .await
             .unwrap();
 
@@ -819,7 +824,7 @@ mod tests {
 
         let mut socket_reader = SocketReaderInMem::new(serialized_data);
 
-        let result = TcpContract::deserialize(&mut socket_reader, &attr)
+        let result = TcpContract::deserialize(&mut socket_reader, Some(&attr))
             .await
             .unwrap();
 

@@ -88,7 +88,7 @@ mod tests {
 
         let tcp_contract = builder.get_result();
 
-        let result = convert_from_raw(tcp_contract, &metadata).await;
+        let result = convert_from_raw(tcp_contract, Some(&metadata)).await;
 
         if let TcpContract::NewMessages {
             topic_id,
@@ -151,7 +151,7 @@ mod tests {
 
         let tcp_contract = builder.get_result();
 
-        let result = convert_from_raw(tcp_contract, &metadata).await;
+        let result = convert_from_raw(tcp_contract, Some(&metadata)).await;
 
         if let TcpContract::NewMessages {
             topic_id,

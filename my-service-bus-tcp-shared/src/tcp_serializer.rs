@@ -31,7 +31,7 @@ impl TcpSocketSerializer<TcpContract, MySbSerializerMetadata> for MySbTcpSeriali
     async fn deserialize<TSocketReader: Send + Sync + 'static + SocketReader>(
         &mut self,
         socket_reader: &mut TSocketReader,
-        metadata: &MySbSerializerMetadata,
+        metadata: Option<&MySbSerializerMetadata>,
     ) -> Result<TcpContract, ReadingTcpContractFail> {
         let result = TcpContract::deserialize(socket_reader, metadata).await?;
 
