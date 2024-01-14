@@ -5,8 +5,6 @@ pub async fn convert_from_raw(
     src: crate::TcpContract,
     metadata: &MySbSerializerMetadata,
 ) -> crate::TcpContract {
-    todo!("Restore")
-    /*
     if let crate::TcpContract::Raw(payload) = src {
         let mut socket_reader = my_tcp_sockets::socket_reader::SocketReaderInMem::new(payload);
 
@@ -16,5 +14,4 @@ pub async fn convert_from_raw(
     }
 
     panic!("This function works only with Raw payload");
-     */
 }

@@ -89,7 +89,7 @@ pub enum TcpContract {
 impl TcpContract {
     pub async fn deserialize<TSocketReader: SocketReader + Send + Sync + 'static>(
         socket_reader: &mut TSocketReader,
-        //serializer_metadata: &MySbSerializerMetadata,
+        serializer_metadata: &MySbSerializerMetadata,
     ) -> Result<TcpContract, ReadingTcpContractFail> {
         let packet_no = socket_reader.read_byte().await?;
 
@@ -108,7 +108,6 @@ impl TcpContract {
                 Ok(result)
             }
             PUBLISH => {
-                /*
                 let topic_id =
                     crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
                 let request_id = socket_reader.read_i64().await?;
@@ -142,8 +141,6 @@ impl TcpContract {
                     persist_immediately: socket_reader.read_bool().await?,
                 };
                 Ok(result)
-                 */
-                todo!("Publish packet is not used by server")
             }
             PUBLISH_RESPONSE => {
                 let request_id = socket_reader.read_i64().await?;
@@ -179,7 +176,6 @@ impl TcpContract {
             }
 
             NEW_MESSAGES => {
-                /*
                 let topic_id =
                     crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
                 let queue_id =
@@ -208,9 +204,6 @@ impl TcpContract {
                 };
 
                 Ok(result)
-                 */
-
-                todo!("Publish packet is not used by server")
             }
             ALL_MESSAGES_DELIVERED_CONFIRMATION => {
                 let topic_id =
@@ -561,7 +554,6 @@ impl my_tcp_sockets::TcpContract for TcpContract {
         false
     }
 }
-/*
 #[cfg(test)]
 mod tests {
 
@@ -855,4 +847,3 @@ mod tests {
         }
     }
 }
- */
