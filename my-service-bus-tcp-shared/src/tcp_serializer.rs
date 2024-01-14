@@ -31,29 +31,10 @@ impl TcpSocketSerializer<TcpContract, MySbSerializerMetadata> for MySbTcpSeriali
     async fn deserialize<TSocketReader: Send + Sync + 'static + SocketReader>(
         &mut self,
         socket_reader: &mut TSocketReader,
-        metadata: Option<&MySbSerializerMetadata>,
+        metadata: &MySbSerializerMetadata,
     ) -> Result<TcpContract, ReadingTcpContractFail> {
         let result = TcpContract::deserialize(socket_reader, metadata).await?;
 
         Ok(result)
     }
-
-    /*
-    fn apply_packet(&mut self, contract: &TcpContract) -> bool {
-        match contract {
-            TcpContract::Greeting {
-                name: _,
-                protocol_version,
-            } => {
-                self.attr.protocol_version = *protocol_version;
-                true
-            }
-            TcpContract::PacketVersions { packet_versions } => {
-                self.attr.versions.update(packet_versions);
-                true
-            }
-            _ => false,
-        }
-    }
-     */
 }

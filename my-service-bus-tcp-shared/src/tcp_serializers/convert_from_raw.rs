@@ -3,7 +3,7 @@ use crate::MySbSerializerMetadata;
 //Now it's harcoded to NewMessages - since we are using it only for NewMessages for now
 pub async fn convert_from_raw(
     src: crate::TcpContract,
-    metadata: Option<&MySbSerializerMetadata>,
+    metadata: &MySbSerializerMetadata,
 ) -> crate::TcpContract {
     if let crate::TcpContract::Raw(payload) = src {
         let mut socket_reader = my_tcp_sockets::socket_reader::SocketReaderInMem::new(payload);
