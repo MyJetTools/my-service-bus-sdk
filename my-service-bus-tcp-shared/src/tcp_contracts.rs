@@ -116,7 +116,7 @@ impl TcpContract {
 
                 let mut data_to_publish: Vec<MessageToPublish> = Vec::with_capacity(messages_count);
 
-                if serializer_metadata.tcp_protocol_version.get_value() < 3 {
+                if serializer_metadata.get_protocol_vection().get_value() < 3 {
                     for _ in 0..messages_count {
                         let content = socket_reader.read_byte_array().await?;
                         data_to_publish.push(MessageToPublish {
@@ -351,7 +351,7 @@ impl TcpContract {
                 *request_id,
                 data_to_publish.as_slice(),
                 *persist_immediately,
-                serializer_metadata.tcp_protocol_version,
+                serializer_metadata.get_protocol_vection(),
             ),
             TcpContract::PublishResponse { request_id } => {
                 write_buffer.write_byte(PUBLISH_RESPONSE);

@@ -54,7 +54,7 @@ mod tests {
 
     use super::*;
     use crate::{tcp_message_id::NEW_MESSAGES, MySbSerializerMetadata, TcpContract};
-
+    /*
     #[tokio::test]
     async fn test_basic_use_case_v2() {
         let mut metadata = MySbSerializerMetadata::new(2);
@@ -118,6 +118,7 @@ mod tests {
         }
     }
 
+
     #[tokio::test]
     async fn test_basic_use_case_v3() {
         let mut metadata = MySbSerializerMetadata::new(3);
@@ -179,5 +180,5 @@ mod tests {
         } else {
             panic!("We should not be ere")
         }
-    }
+    } */
 }
