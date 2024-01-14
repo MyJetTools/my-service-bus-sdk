@@ -80,6 +80,21 @@ impl TcpSerializationMetadata<TcpContract> for MySbSerializerMetadata {
     }
 }
 
+impl TcpSerializationMetadata<TcpContract> for () {
+    fn is_tcp_contract_related_to_metadata(&self, contract: &TcpContract) -> bool {
+        match contract {
+            TcpContract::Greeting {
+                name: _,
+                protocol_version: _,
+            } => true,
+            TcpContract::PacketVersions { packet_versions: _ } => true,
+            _ => false,
+        }
+    }
+
+    fn apply_tcp_contract(&mut self, contract: &TcpContract) {}
+}
+
 #[cfg(test)]
 mod test {
 
