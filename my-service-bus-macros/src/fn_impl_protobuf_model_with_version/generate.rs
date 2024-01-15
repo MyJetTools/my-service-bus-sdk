@@ -53,7 +53,7 @@ pub fn generate(attr: TokenStream, input: TokenStream) -> Result<proc_macro::Tok
         impl my_service_bus::abstractions::subscriber::MySbMessageDeserializer for #struct_name{
             type Item = Self;
 
-            fn deserialize(bytes: &[u8], _: &Option<std::collections::HashMap<String, String>>) -> Result<Self, my_service_bus::abstractions::SubscriberError> {
+            fn deserialize(bytes: &[u8], _: &my_service_bus::abstractions::SbMessageHeaders) -> Result<Self, my_service_bus::abstractions::SubscriberError> {
                 match Self::from_protobuf_bytes(bytes) {
                     Ok(ok) => Ok(ok),
                     Err(err) => Err(
