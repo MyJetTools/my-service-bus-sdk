@@ -1,4 +1,4 @@
-use super::TcpContract;
+use super::MySbTcpContract;
 
 const PING_NAME: &str = "Ping";
 const PONG_NAME: &str = "Pong";
@@ -23,59 +23,59 @@ const ALL_MESSAGES_CONFIRMED_AS_FAIL: &str = "AllMessagesConfirmedAsFail";
 
 const CONFIRM_SOME_MESSAGES_AS_OK: &str = "ConfirmSomeMessagesAsOk";
 
-impl TcpContract {
+impl MySbTcpContract {
     pub fn to_string(&self) -> &'static str {
         match self {
-            TcpContract::Ping => PING_NAME,
-            TcpContract::Pong => PONG_NAME,
-            TcpContract::Greeting {
+            MySbTcpContract::Ping => PING_NAME,
+            MySbTcpContract::Pong => PONG_NAME,
+            MySbTcpContract::Greeting {
                 name: _,
                 protocol_version: _,
             } => GREETING_NAME,
-            TcpContract::Publish {
+            MySbTcpContract::Publish {
                 topic_id: _,
                 request_id: _,
                 persist_immediately: _,
                 data_to_publish: _,
             } => PUBLISH_NAME,
-            TcpContract::PublishResponse { request_id: _ } => PUBLISH_RESPONSE_NAME,
-            TcpContract::Subscribe {
+            MySbTcpContract::PublishResponse { request_id: _ } => PUBLISH_RESPONSE_NAME,
+            MySbTcpContract::Subscribe {
                 topic_id: _,
                 queue_id: _,
                 queue_type: _,
             } => SUBSCRIBE_NAME,
-            TcpContract::SubscribeResponse {
+            MySbTcpContract::SubscribeResponse {
                 topic_id: _,
                 queue_id: _,
             } => SUBSCRIBER_RESPONSE,
-            TcpContract::NewMessages {
+            MySbTcpContract::NewMessages {
                 topic_id: _,
                 messages: _,
                 confirmation_id: _,
                 queue_id: _,
             } => NEW_MESSAGES,
-            TcpContract::Raw(_) => RAW_PAYLOAD,
-            TcpContract::NewMessagesConfirmation {
+            MySbTcpContract::Raw(_) => RAW_PAYLOAD,
+            MySbTcpContract::NewMessagesConfirmation {
                 topic_id: _,
                 queue_id: _,
                 confirmation_id: _,
             } => NEW_MESSAGES_CONFIRMATION,
-            TcpContract::CreateTopicIfNotExists { topic_id: _ } => CREATE_TOPIC_IF_EXIST,
-            TcpContract::IntermediaryConfirm {
+            MySbTcpContract::CreateTopicIfNotExists { topic_id: _ } => CREATE_TOPIC_IF_EXIST,
+            MySbTcpContract::IntermediaryConfirm {
                 packet_version: _,
                 topic_id: _,
                 queue_id: _,
                 confirmation_id: _,
                 delivered: _,
             } => INTERMEDIARY_CONFIRM,
-            TcpContract::PacketVersions { packet_versions: _ } => PACKET_VERSIONS,
-            TcpContract::Reject { message: _ } => REJECT,
-            TcpContract::AllMessagesConfirmedAsFail {
+            MySbTcpContract::PacketVersions { packet_versions: _ } => PACKET_VERSIONS,
+            MySbTcpContract::Reject { message: _ } => REJECT,
+            MySbTcpContract::AllMessagesConfirmedAsFail {
                 topic_id: _,
                 queue_id: _,
                 confirmation_id: _,
             } => ALL_MESSAGES_CONFIRMED_AS_FAIL,
-            TcpContract::ConfirmSomeMessagesAsOk {
+            MySbTcpContract::ConfirmSomeMessagesAsOk {
                 packet_version: _,
                 topic_id: _,
                 queue_id: _,

@@ -1,7 +1,7 @@
 use my_service_bus_abstractions::MyServiceBusMessage;
 use my_tcp_sockets::TcpWriteBuffer;
 
-use crate::{tcp_message_id, tcp_serializers::*, PacketProtVer, TcpContract};
+use crate::{tcp_message_id, tcp_serializers::*, MySbTcpContract, PacketProtVer};
 
 pub struct DeliverTcpPacketBuilder {
     payload: Vec<u8>,
@@ -39,11 +39,11 @@ impl DeliverTcpPacketBuilder {
         self.amount += 1;
     }
 
-    pub fn get_result(mut self) -> TcpContract {
+    pub fn get_result(mut self) -> MySbTcpContract {
         let size = self.amount.to_le_bytes();
         let dest = &mut self.payload[self.amount_offset..self.amount_offset + 4];
         dest.copy_from_slice(size.as_slice());
-        TcpContract::Raw(self.payload)
+        MySbTcpContract::Raw(self.payload)
     }
 }
 
@@ -53,7 +53,7 @@ mod tests {
     use my_service_bus_abstractions::{MySbMessage, SbMessageHeaders};
 
     use super::*;
-    use crate::{tcp_message_id::NEW_MESSAGES, MySbSerializerMetadata, TcpContract};
+    use crate::{tcp_message_id::NEW_MESSAGES, MySbSerializerMetadata, MySbTcpContract};
 
     #[tokio::test]
     async fn test_basic_use_case_v2() {
@@ -90,7 +90,7 @@ mod tests {
 
         let result = convert_from_raw(tcp_contract, &metadata).await;
 
-        if let TcpContract::NewMessages {
+        if let MySbTcpContract::NewMessages {
             topic_id,
             queue_id,
             confirmation_id,
@@ -153,7 +153,7 @@ mod tests {
 
         let result = convert_from_raw(tcp_contract, &metadata).await;
 
-        if let TcpContract::NewMessages {
+        if let MySbTcpContract::NewMessages {
             topic_id,
             queue_id,
             confirmation_id,

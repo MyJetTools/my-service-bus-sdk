@@ -12,7 +12,7 @@ mod tcp_serializer;
 pub use my_sb_serializer_metadata::*;
 
 pub use packet_versions::PacketVersions;
-pub use tcp_contracts::TcpContract;
+pub use tcp_contracts::MySbTcpContract;
 pub use tcp_serializer::MySbTcpSerializer;
 mod tcp_protocol_version;
 pub use tcp_protocol_version::*;

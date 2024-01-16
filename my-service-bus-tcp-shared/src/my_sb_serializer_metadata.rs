@@ -1,6 +1,6 @@
 use my_tcp_sockets::{TcpSerializerMetadata, TcpSerializerMetadataFactory};
 
-use crate::{TcpContract, TcpProtocolVersion};
+use crate::{MySbTcpContract, TcpProtocolVersion};
 
 use super::PacketVersions;
 
@@ -52,27 +52,27 @@ impl MySbSerializerMetadata {
     }
 }
 
-impl TcpSerializerMetadata<TcpContract> for MySbSerializerMetadata {
-    fn is_tcp_contract_related_to_metadata(&self, contract: &TcpContract) -> bool {
+impl TcpSerializerMetadata<MySbTcpContract> for MySbSerializerMetadata {
+    fn is_tcp_contract_related_to_metadata(&self, contract: &MySbTcpContract) -> bool {
         match contract {
-            TcpContract::Greeting {
+            MySbTcpContract::Greeting {
                 name: _,
                 protocol_version: _,
             } => true,
-            TcpContract::PacketVersions { packet_versions: _ } => true,
+            MySbTcpContract::PacketVersions { packet_versions: _ } => true,
             _ => false,
         }
     }
 
-    fn apply_tcp_contract(&mut self, contract: &TcpContract) {
+    fn apply_tcp_contract(&mut self, contract: &MySbTcpContract) {
         match contract {
-            TcpContract::Greeting {
+            MySbTcpContract::Greeting {
                 name: _,
                 protocol_version,
             } => {
                 self.tcp_protocol_version = (*protocol_version).into();
             }
-            TcpContract::PacketVersions { packet_versions } => {
+            MySbTcpContract::PacketVersions { packet_versions } => {
                 self.versions.update(packet_versions);
             }
             _ => {}
@@ -82,7 +82,7 @@ impl TcpSerializerMetadata<TcpContract> for MySbSerializerMetadata {
 
 pub struct SbTcpSerializerMetadataFactory;
 #[async_trait::async_trait]
-impl TcpSerializerMetadataFactory<TcpContract, MySbSerializerMetadata>
+impl TcpSerializerMetadataFactory<MySbTcpContract, MySbSerializerMetadata>
     for SbTcpSerializerMetadataFactory
 {
     async fn create(&self) -> MySbSerializerMetadata {

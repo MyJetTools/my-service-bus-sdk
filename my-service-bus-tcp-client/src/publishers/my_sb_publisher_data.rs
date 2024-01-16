@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use my_service_bus_abstractions::{publisher::MessageToPublish, PublishError};
-use my_service_bus_tcp_shared::TcpContract;
+use my_service_bus_tcp_shared::MySbTcpContract;
 use rust_extensions::{TaskCompletion, TaskCompletionAwaiter};
 
 use super::PublishProcessByConnection;
@@ -31,7 +31,7 @@ impl MySbPublisherData {
         topic_id: &str,
         messages: &[MessageToPublish],
         protocol_version: my_service_bus_tcp_shared::TcpProtocolVersion,
-    ) -> Result<(i64, TcpContract), PublishError> {
+    ) -> Result<(i64, MySbTcpContract), PublishError> {
         if self.connection.is_none() {
             return Err(PublishError::NoConnectionToPublish);
         }
@@ -40,7 +40,7 @@ impl MySbPublisherData {
 
         let mut payload = Vec::new();
 
-        TcpContract::compile_publish_payload(
+        MySbTcpContract::compile_publish_payload(
             &mut payload,
             topic_id,
             request_id,
@@ -49,12 +49,12 @@ impl MySbPublisherData {
             protocol_version,
         );
 
-        Ok((request_id, TcpContract::Raw(payload)))
+        Ok((request_id, MySbTcpContract::Raw(payload)))
     }
 
     pub async fn publish_to_socket(
         &mut self,
-        tcp_contract: &mut TcpContract,
+        tcp_contract: &mut MySbTcpContract,
         request_id: i64,
     ) -> TaskCompletionAwaiter<(), PublishError> {
         let connection = self.connection.as_mut().unwrap();

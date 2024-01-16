@@ -18,7 +18,7 @@ pub type RequestId = i64;
 pub type ConfirmationId = i64;
 
 #[derive(Debug, Clone)]
-pub enum TcpContract {
+pub enum MySbTcpContract {
     Ping,
     Pong,
     Greeting {
@@ -86,22 +86,22 @@ pub enum TcpContract {
     },
 }
 
-impl TcpContract {
+impl MySbTcpContract {
     pub async fn deserialize<TSocketReader: SocketReader + Send + Sync + 'static>(
         socket_reader: &mut TSocketReader,
         serializer_metadata: &MySbSerializerMetadata,
-    ) -> Result<TcpContract, ReadingTcpContractFail> {
+    ) -> Result<MySbTcpContract, ReadingTcpContractFail> {
         let packet_no = socket_reader.read_byte().await?;
 
         let result = match packet_no {
-            PING => Ok(TcpContract::Ping {}),
-            PONG => Ok(TcpContract::Pong {}),
+            PING => Ok(MySbTcpContract::Ping {}),
+            PONG => Ok(MySbTcpContract::Pong {}),
             GREETING => {
                 let name =
                     crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
                 let protocol_version = socket_reader.read_i32().await?;
 
-                let result = TcpContract::Greeting {
+                let result = MySbTcpContract::Greeting {
                     name,
                     protocol_version,
                 };
@@ -134,7 +134,7 @@ impl TcpContract {
                     }
                 }
 
-                let result = TcpContract::Publish {
+                let result = MySbTcpContract::Publish {
                     topic_id,
                     request_id,
                     data_to_publish,
@@ -144,7 +144,7 @@ impl TcpContract {
             }
             PUBLISH_RESPONSE => {
                 let request_id = socket_reader.read_i64().await?;
-                let result = TcpContract::PublishResponse { request_id };
+                let result = MySbTcpContract::PublishResponse { request_id };
 
                 Ok(result)
             }
@@ -157,7 +157,7 @@ impl TcpContract {
 
                 let queue_type = TopicQueueType::from_u8(queue_type);
 
-                let result = TcpContract::Subscribe {
+                let result = MySbTcpContract::Subscribe {
                     topic_id,
                     queue_id,
                     queue_type,
@@ -170,7 +170,7 @@ impl TcpContract {
                     crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
                 let queue_id =
                     crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
-                let result = TcpContract::SubscribeResponse { topic_id, queue_id };
+                let result = MySbTcpContract::SubscribeResponse { topic_id, queue_id };
 
                 Ok(result)
             }
@@ -196,7 +196,7 @@ impl TcpContract {
                     messages.push(msg);
                 }
 
-                let result = TcpContract::NewMessages {
+                let result = MySbTcpContract::NewMessages {
                     topic_id,
                     queue_id,
                     confirmation_id,
@@ -212,7 +212,7 @@ impl TcpContract {
                     crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
                 let confirmation_id = socket_reader.read_i64().await?;
 
-                let result = TcpContract::NewMessagesConfirmation {
+                let result = MySbTcpContract::NewMessagesConfirmation {
                     topic_id,
                     queue_id,
                     confirmation_id,
@@ -224,7 +224,7 @@ impl TcpContract {
                 let topic_id =
                     crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
 
-                let result = TcpContract::CreateTopicIfNotExists { topic_id };
+                let result = MySbTcpContract::CreateTopicIfNotExists { topic_id };
 
                 Ok(result)
             }
@@ -232,7 +232,7 @@ impl TcpContract {
             REJECT => {
                 let message =
                     crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
-                let result = TcpContract::Reject { message };
+                let result = MySbTcpContract::Reject { message };
                 Ok(result)
             }
 
@@ -247,7 +247,7 @@ impl TcpContract {
                     packet_versions.insert(p, v);
                 }
 
-                let result = TcpContract::PacketVersions { packet_versions };
+                let result = MySbTcpContract::PacketVersions { packet_versions };
 
                 Ok(result)
             }
@@ -259,7 +259,7 @@ impl TcpContract {
                     crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
                 let confirmation_id = socket_reader.read_i64().await?;
 
-                let result = TcpContract::AllMessagesConfirmedAsFail {
+                let result = MySbTcpContract::AllMessagesConfirmedAsFail {
                     topic_id,
                     queue_id,
                     confirmation_id,
@@ -280,7 +280,7 @@ impl TcpContract {
                     crate::tcp_serializers::queue_with_intervals::deserialize(socket_reader)
                         .await?;
 
-                let result = TcpContract::ConfirmSomeMessagesAsOk {
+                let result = MySbTcpContract::ConfirmSomeMessagesAsOk {
                     packet_version,
                     topic_id,
                     queue_id,
@@ -303,7 +303,7 @@ impl TcpContract {
                     crate::tcp_serializers::queue_with_intervals::deserialize(socket_reader)
                         .await?;
 
-                let result = TcpContract::IntermediaryConfirm {
+                let result = MySbTcpContract::IntermediaryConfirm {
                     packet_version,
                     topic_id,
                     queue_id,
@@ -326,13 +326,13 @@ impl TcpContract {
         serializer_metadata: &MySbSerializerMetadata,
     ) {
         match self {
-            TcpContract::Ping {} => {
+            MySbTcpContract::Ping {} => {
                 write_buffer.write_byte(PING);
             }
-            TcpContract::Pong {} => {
+            MySbTcpContract::Pong {} => {
                 write_buffer.write_byte(PONG);
             }
-            TcpContract::Greeting {
+            MySbTcpContract::Greeting {
                 name,
                 protocol_version,
             } => {
@@ -340,7 +340,7 @@ impl TcpContract {
                 write_buffer.write_pascal_string(name.as_str());
                 write_buffer.write_i32(*protocol_version);
             }
-            TcpContract::Publish {
+            MySbTcpContract::Publish {
                 topic_id,
                 request_id,
                 persist_immediately,
@@ -353,13 +353,13 @@ impl TcpContract {
                 *persist_immediately,
                 serializer_metadata.tcp_protocol_version,
             ),
-            TcpContract::PublishResponse { request_id } => {
+            MySbTcpContract::PublishResponse { request_id } => {
                 write_buffer.write_byte(PUBLISH_RESPONSE);
                 write_buffer.write_i64(*request_id);
                 //crate::tcp_serializers::i64::serialize(&mut result, *request_id);
                 //result.into()
             }
-            TcpContract::Subscribe {
+            MySbTcpContract::Subscribe {
                 topic_id,
                 queue_id,
                 queue_type,
@@ -377,7 +377,7 @@ impl TcpContract {
                 //crate::tcp_serializers::byte::serialize(&mut result, queue_type.into_u8());
                 //result.into()
             }
-            TcpContract::SubscribeResponse { topic_id, queue_id } => {
+            MySbTcpContract::SubscribeResponse { topic_id, queue_id } => {
                 //let mut result: Vec<u8> = Vec::new();
                 write_buffer.write_byte(SUBSCRIBE_RESPONSE);
 
@@ -388,10 +388,10 @@ impl TcpContract {
                 //crate::tcp_serializers::pascal_string::serialize(&mut result, queue_id.as_str());
                 // result.into()
             }
-            TcpContract::Raw(payload) => {
+            MySbTcpContract::Raw(payload) => {
                 write_buffer.write_slice(payload);
             }
-            TcpContract::NewMessages {
+            MySbTcpContract::NewMessages {
                 topic_id: _,
                 queue_id: _,
                 confirmation_id: _,
@@ -401,7 +401,7 @@ impl TcpContract {
                     "This packet is not used by server. Server uses optimized version of the packet"
                 );
             }
-            TcpContract::NewMessagesConfirmation {
+            MySbTcpContract::NewMessagesConfirmation {
                 topic_id,
                 queue_id,
                 confirmation_id,
@@ -419,7 +419,7 @@ impl TcpContract {
                 //crate::tcp_serializers::i64::serialize(&mut result, *confirmation_id);
                 // result.into()
             }
-            TcpContract::CreateTopicIfNotExists { topic_id } => {
+            MySbTcpContract::CreateTopicIfNotExists { topic_id } => {
                 //let mut result: Vec<u8> = Vec::new();
                 write_buffer.write_byte(CREATE_TOPIC_IF_NOT_EXISTS);
 
@@ -427,7 +427,7 @@ impl TcpContract {
                 //crate::tcp_serializers::pascal_string::serialize(&mut result, topic_id.as_str());
                 //result.into()
             }
-            TcpContract::IntermediaryConfirm {
+            MySbTcpContract::IntermediaryConfirm {
                 packet_version,
                 topic_id,
                 queue_id,
@@ -450,7 +450,7 @@ impl TcpContract {
                 crate::tcp_serializers::queue_with_intervals::serialize(write_buffer, &delivered);
                 //result.into()
             }
-            TcpContract::PacketVersions { packet_versions } => {
+            MySbTcpContract::PacketVersions { packet_versions } => {
                 //let mut result: Vec<u8> = Vec::new();
                 write_buffer.write_byte(PACKET_VERSIONS);
 
@@ -467,7 +467,7 @@ impl TcpContract {
                 }
                 // result.into()
             }
-            TcpContract::Reject { message } => {
+            MySbTcpContract::Reject { message } => {
                 //let mut result: Vec<u8> = Vec::new();
                 write_buffer.write_byte(REJECT);
 
@@ -475,7 +475,7 @@ impl TcpContract {
                 //crate::tcp_serializers::pascal_string::serialize(&mut result, message.as_str());
                 //result.into()
             }
-            TcpContract::AllMessagesConfirmedAsFail {
+            MySbTcpContract::AllMessagesConfirmedAsFail {
                 topic_id,
                 queue_id,
                 confirmation_id,
@@ -494,7 +494,7 @@ impl TcpContract {
                 //result.into()
             }
 
-            TcpContract::ConfirmSomeMessagesAsOk {
+            MySbTcpContract::ConfirmSomeMessagesAsOk {
                 packet_version,
                 topic_id,
                 queue_id,
@@ -545,9 +545,9 @@ impl TcpContract {
     }
 }
 
-impl my_tcp_sockets::TcpContract for TcpContract {
+impl my_tcp_sockets::TcpContract for MySbTcpContract {
     fn is_pong(&self) -> bool {
-        if let TcpContract::Pong = self {
+        if let MySbTcpContract::Pong = self {
             return true;
         }
 
@@ -564,7 +564,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ping_packet() {
-        let tcp_packet = TcpContract::Ping;
+        let tcp_packet = MySbTcpContract::Ping;
 
         let mut serialized_data = Vec::new();
 
@@ -574,12 +574,12 @@ mod tests {
         let mut socket_reader = SocketReaderInMem::new(serialized_data);
         let attr = MySbSerializerMetadata::new(0);
 
-        let result = TcpContract::deserialize(&mut socket_reader, &attr)
+        let result = MySbTcpContract::deserialize(&mut socket_reader, &attr)
             .await
             .unwrap();
 
         match result {
-            TcpContract::Ping => {}
+            MySbTcpContract::Ping => {}
             _ => {
                 panic!("Invalid Packet Type");
             }
@@ -588,7 +588,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pong_packet() {
-        let tcp_packet = TcpContract::Pong;
+        let tcp_packet = MySbTcpContract::Pong;
 
         let mut serialized_data: Vec<u8> = Vec::new();
 
@@ -598,12 +598,12 @@ mod tests {
         let mut socket_reader = SocketReaderInMem::new(serialized_data);
         let attr = MySbSerializerMetadata::new(0);
 
-        let result = TcpContract::deserialize(&mut socket_reader, &attr)
+        let result = MySbTcpContract::deserialize(&mut socket_reader, &attr)
             .await
             .unwrap();
 
         match result {
-            TcpContract::Pong => {}
+            MySbTcpContract::Pong => {}
             _ => {
                 panic!("Invalid Packet Type");
             }
@@ -615,7 +615,7 @@ mod tests {
         let test_app_name = "test_app";
         let test_protocol_version = 2;
 
-        let tcp_packet = TcpContract::Greeting {
+        let tcp_packet = MySbTcpContract::Greeting {
             name: test_app_name.to_string(),
             protocol_version: test_protocol_version,
         };
@@ -628,12 +628,12 @@ mod tests {
 
         let attr = MySbSerializerMetadata::new(0);
 
-        let result = TcpContract::deserialize(&mut socket_reader, &attr)
+        let result = MySbTcpContract::deserialize(&mut socket_reader, &attr)
             .await
             .unwrap();
 
         match result {
-            TcpContract::Greeting {
+            MySbTcpContract::Greeting {
                 name,
                 protocol_version,
             } => {
@@ -661,7 +661,7 @@ mod tests {
         let topic_test = String::from("test-topic");
         let persist_test = true;
 
-        let tcp_packet = TcpContract::Publish {
+        let tcp_packet = MySbTcpContract::Publish {
             data_to_publish: data_test,
             persist_immediately: persist_test,
             request_id: request_id_test,
@@ -675,12 +675,12 @@ mod tests {
 
         let mut socket_reader = SocketReaderInMem::new(serialized_data);
 
-        let result = TcpContract::deserialize(&mut socket_reader, &attr)
+        let result = MySbTcpContract::deserialize(&mut socket_reader, &attr)
             .await
             .unwrap();
 
         match result {
-            TcpContract::Publish {
+            MySbTcpContract::Publish {
                 data_to_publish,
                 persist_immediately,
                 request_id,
@@ -721,7 +721,7 @@ mod tests {
         let topic_test = String::from("test-topic");
         let persist_test = true;
 
-        let tcp_packet = TcpContract::Publish {
+        let tcp_packet = MySbTcpContract::Publish {
             data_to_publish: data_test,
             persist_immediately: persist_test,
             request_id: request_id_test,
@@ -734,12 +734,12 @@ mod tests {
 
         let mut socket_reader = SocketReaderInMem::new(serialized_data);
 
-        let result = TcpContract::deserialize(&mut socket_reader, &attr)
+        let result = MySbTcpContract::deserialize(&mut socket_reader, &attr)
             .await
             .unwrap();
 
         match result {
-            TcpContract::Publish {
+            MySbTcpContract::Publish {
                 mut data_to_publish,
                 persist_immediately,
                 request_id,
@@ -775,7 +775,7 @@ mod tests {
 
         let request_id_test = 1;
 
-        let tcp_packet = TcpContract::PublishResponse {
+        let tcp_packet = MySbTcpContract::PublishResponse {
             request_id: request_id_test,
         };
 
@@ -786,12 +786,12 @@ mod tests {
 
         let mut socket_reader = SocketReaderInMem::new(serialized_data);
 
-        let result = TcpContract::deserialize(&mut socket_reader, &attr)
+        let result = MySbTcpContract::deserialize(&mut socket_reader, &attr)
             .await
             .unwrap();
 
         match result {
-            TcpContract::PublishResponse { request_id } => {
+            MySbTcpContract::PublishResponse { request_id } => {
                 assert_eq!(request_id_test, request_id);
             }
             _ => {
@@ -807,7 +807,7 @@ mod tests {
         let topic_id_test = String::from("topic");
         let queue_type_test = TopicQueueType::PermanentWithSingleConnection;
 
-        let tcp_packet = TcpContract::Subscribe {
+        let tcp_packet = MySbTcpContract::Subscribe {
             queue_id: queue_id_test,
             topic_id: topic_id_test,
             queue_type: queue_type_test,
@@ -819,12 +819,12 @@ mod tests {
 
         let mut socket_reader = SocketReaderInMem::new(serialized_data);
 
-        let result = TcpContract::deserialize(&mut socket_reader, &attr)
+        let result = MySbTcpContract::deserialize(&mut socket_reader, &attr)
             .await
             .unwrap();
 
         match result {
-            TcpContract::Subscribe {
+            MySbTcpContract::Subscribe {
                 queue_id,
                 queue_type,
                 topic_id,

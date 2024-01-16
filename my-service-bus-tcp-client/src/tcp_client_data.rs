@@ -1,10 +1,13 @@
 use std::sync::{atomic::AtomicBool, Arc};
 
-use my_service_bus_tcp_shared::{MySbSerializerMetadata, MySbTcpSerializer, TcpContract};
+use my_service_bus_tcp_shared::{MySbSerializerMetadata, MySbTcpContract, MySbTcpSerializer};
 use my_tcp_sockets::tcp_connection::TcpSocketConnection;
 use rust_extensions::{Logger, StrOrString};
 
 use crate::{publishers::MySbPublishers, subscribers::MySbSubscribers};
+
+pub type MySbTcpConnection =
+    TcpSocketConnection<MySbTcpContract, MySbTcpSerializer, MySbSerializerMetadata>;
 
 pub struct TcpClientData {
     pub app_name: StrOrString<'static>,
@@ -17,15 +20,10 @@ pub struct TcpClientData {
 }
 
 #[async_trait::async_trait]
-impl my_tcp_sockets::SocketEventCallback<TcpContract, MySbTcpSerializer, MySbSerializerMetadata>
+impl my_tcp_sockets::SocketEventCallback<MySbTcpContract, MySbTcpSerializer, MySbSerializerMetadata>
     for TcpClientData
 {
-    async fn connected(
-        &self,
-        connection: Arc<
-            TcpSocketConnection<TcpContract, MySbTcpSerializer, MySbSerializerMetadata>,
-        >,
-    ) {
+    async fn connected(&self, connection: Arc<MySbTcpConnection>) {
         super::new_connection_handler::send_greeting(
             &connection,
             self.app_name.as_str(),
@@ -43,30 +41,19 @@ impl my_tcp_sockets::SocketEventCallback<TcpContract, MySbTcpSerializer, MySbSer
             .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
-    async fn disconnected(
-        &self,
-        _connection: Arc<
-            TcpSocketConnection<TcpContract, MySbTcpSerializer, MySbSerializerMetadata>,
-        >,
-    ) {
+    async fn disconnected(&self, _connection: Arc<MySbTcpConnection>) {
         self.has_connection
             .store(false, std::sync::atomic::Ordering::SeqCst);
         self.publishers.disconnect().await;
         self.subscribers.disconnect().await;
     }
 
-    async fn payload(
-        &self,
-        connection: &Arc<
-            TcpSocketConnection<TcpContract, MySbTcpSerializer, MySbSerializerMetadata>,
-        >,
-        contract: TcpContract,
-    ) {
+    async fn payload(&self, connection: &Arc<MySbTcpConnection>, contract: MySbTcpContract) {
         match contract {
-            my_service_bus_tcp_shared::TcpContract::PublishResponse { request_id } => {
+            my_service_bus_tcp_shared::MySbTcpContract::PublishResponse { request_id } => {
                 self.publishers.set_confirmed(request_id).await;
             }
-            my_service_bus_tcp_shared::TcpContract::NewMessages {
+            my_service_bus_tcp_shared::MySbTcpContract::NewMessages {
                 topic_id,
                 queue_id,
                 confirmation_id,

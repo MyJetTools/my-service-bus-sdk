@@ -4,7 +4,7 @@ use my_tcp_sockets::{
     TcpSocketSerializer, TcpWriteBuffer,
 };
 
-use crate::{MySbSerializerMetadata, TcpContract};
+use crate::{MySbSerializerMetadata, MySbTcpContract};
 
 pub struct MySbTcpSerializer;
 
@@ -15,25 +15,25 @@ impl Default for MySbTcpSerializer {
 }
 
 #[async_trait]
-impl TcpSocketSerializer<TcpContract, MySbSerializerMetadata> for MySbTcpSerializer {
+impl TcpSocketSerializer<MySbTcpContract, MySbSerializerMetadata> for MySbTcpSerializer {
     fn serialize(
         &self,
         out: &mut impl TcpWriteBuffer,
-        contract: &TcpContract,
+        contract: &MySbTcpContract,
         metadata: &MySbSerializerMetadata,
     ) {
         contract.serialize(out, metadata)
     }
 
-    fn get_ping(&self) -> TcpContract {
-        TcpContract::Ping
+    fn get_ping(&self) -> MySbTcpContract {
+        MySbTcpContract::Ping
     }
     async fn deserialize<TSocketReader: Send + Sync + 'static + SocketReader>(
         &mut self,
         socket_reader: &mut TSocketReader,
         metadata: &MySbSerializerMetadata,
-    ) -> Result<TcpContract, ReadingTcpContractFail> {
-        let result = TcpContract::deserialize(socket_reader, metadata).await?;
+    ) -> Result<MySbTcpContract, ReadingTcpContractFail> {
+        let result = MySbTcpContract::deserialize(socket_reader, metadata).await?;
 
         Ok(result)
     }

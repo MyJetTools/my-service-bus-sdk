@@ -4,7 +4,7 @@ use my_service_bus_abstractions::{
     MySbMessage, MyServiceBusSubscriberClient, MyServiceBusSubscriberClientCallback,
 };
 
-use my_service_bus_tcp_shared::{MySbSerializerMetadata, MySbTcpSerializer, TcpContract};
+use my_service_bus_tcp_shared::{MySbSerializerMetadata, MySbTcpContract, MySbTcpSerializer};
 
 use my_tcp_sockets::tcp_connection::TcpSocketConnection;
 use tokio::sync::Mutex;
@@ -70,7 +70,7 @@ impl MySbSubscribers {
     pub async fn new_connection(
         &self,
         connection: Arc<
-            TcpSocketConnection<TcpContract, MySbTcpSerializer, MySbSerializerMetadata>,
+            TcpSocketConnection<MySbTcpContract, MySbTcpSerializer, MySbSerializerMetadata>,
         >,
     ) {
         {
@@ -79,7 +79,7 @@ impl MySbSubscribers {
         }
 
         for subscriber in self.get_subscribers().await {
-            let packet = TcpContract::Subscribe {
+            let packet = MySbTcpContract::Subscribe {
                 topic_id: subscriber.get_topic_id().to_string(),
                 queue_id: subscriber.get_queue_id().to_string(),
                 queue_type: subscriber.get_queue_type(),
@@ -93,7 +93,7 @@ impl MySbSubscribers {
         write_access.connection = None;
     }
 
-    fn send_packet(&self, mut tcp_contract: TcpContract, connection_id: i32) {
+    fn send_packet(&self, mut tcp_contract: MySbTcpContract, connection_id: i32) {
         let subscribers = self.subscribers.clone();
 
         tokio::spawn(async move {
@@ -121,13 +121,13 @@ impl MyServiceBusSubscriberClient for MySbSubscribers {
         delivered: bool,
     ) {
         let tcp_contract = if delivered {
-            TcpContract::NewMessagesConfirmation {
+            MySbTcpContract::NewMessagesConfirmation {
                 topic_id: topic_id.to_string(),
                 queue_id: queue_id.to_string(),
                 confirmation_id,
             }
         } else {
-            TcpContract::AllMessagesConfirmedAsFail {
+            MySbTcpContract::AllMessagesConfirmedAsFail {
                 topic_id: topic_id.to_string(),
                 queue_id: queue_id.to_string(),
                 confirmation_id,
@@ -145,7 +145,7 @@ impl MyServiceBusSubscriberClient for MySbSubscribers {
         connection_id: i32,
         delivered: Vec<my_service_bus_abstractions::queue_with_intervals::QueueIndexRange>,
     ) {
-        let tcp_contract = TcpContract::ConfirmSomeMessagesAsOk {
+        let tcp_contract = MySbTcpContract::ConfirmSomeMessagesAsOk {
             topic_id: topic_id.to_string(),
             queue_id: queue_id.to_string(),
             confirmation_id,
