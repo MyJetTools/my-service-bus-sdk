@@ -11,7 +11,7 @@ my-service-bus-shared = { path = "../my-service-bus-shared" }
 my-service-bus-tcp-shared = { path = "../my-service-bus-tcp-shared", features = [
     "tcp-client",
 ] }
-my-tcp-sockets = { tag = "0.1.9", git = "https://github.com/MyJetTools/my-tcp-sockets.git" }
+my-tcp-sockets = { branch = "main", git = "https://github.com/MyJetTools/my-tcp-sockets.git" }
 rust-extensions = { tag = "0.1.4", git = "https://github.com/MyJetTools/rust-extensions.git" }
 
 tokio = { version = "*", features = ["full"] }

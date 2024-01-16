@@ -1,7 +1,7 @@
 use std::sync::{atomic::AtomicBool, Arc};
 
-use my_service_bus_tcp_shared::{MySbSerializerMetadata, MySbTcpSerializer};
-use my_tcp_sockets::ConnectionEvent;
+use my_service_bus_tcp_shared::{MySbSerializerMetadata, MySbTcpSerializer, TcpContract};
+use my_tcp_sockets::tcp_connection::TcpSocketConnection;
 use rust_extensions::{Logger, StrOrString};
 
 use crate::{publishers::MySbPublishers, subscribers::MySbSubscribers};
@@ -16,17 +16,51 @@ pub struct TcpClientData {
     pub has_connection: Arc<AtomicBool>,
 }
 
-impl TcpClientData {
-    pub async fn new_incoming_data(
+#[async_trait::async_trait]
+impl my_tcp_sockets::SocketEventCallback<TcpContract, MySbTcpSerializer, MySbSerializerMetadata>
+    for TcpClientData
+{
+    async fn connected(
         &self,
         connection: Arc<
-            my_tcp_sockets::tcp_connection::TcpSocketConnection<
-                my_service_bus_tcp_shared::TcpContract,
-                MySbTcpSerializer,
-                MySbSerializerMetadata,
-            >,
+            TcpSocketConnection<TcpContract, MySbTcpSerializer, MySbSerializerMetadata>,
         >,
-        contract: my_service_bus_tcp_shared::TcpContract,
+    ) {
+        super::new_connection_handler::send_greeting(
+            &connection,
+            self.app_name.as_str(),
+            self.app_version.as_str(),
+            self.client_version.as_str(),
+        )
+        .await;
+
+        super::new_connection_handler::send_packet_versions(&connection).await;
+
+        self.publishers.new_connection(connection.clone()).await;
+        self.subscribers.new_connection(connection.clone()).await;
+
+        self.has_connection
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    async fn disconnected(
+        &self,
+        _connection: Arc<
+            TcpSocketConnection<TcpContract, MySbTcpSerializer, MySbSerializerMetadata>,
+        >,
+    ) {
+        self.has_connection
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        self.publishers.disconnect().await;
+        self.subscribers.disconnect().await;
+    }
+
+    async fn payload(
+        &self,
+        connection: &Arc<
+            TcpSocketConnection<TcpContract, MySbTcpSerializer, MySbSerializerMetadata>,
+        >,
+        contract: TcpContract,
     ) {
         match contract {
             my_service_bus_tcp_shared::TcpContract::PublishResponse { request_id } => {
@@ -43,54 +77,6 @@ impl TcpClientData {
                     .await
             }
             _ => {}
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl
-    my_tcp_sockets::SocketEventCallback<
-        my_service_bus_tcp_shared::TcpContract,
-        MySbTcpSerializer,
-        MySbSerializerMetadata,
-    > for TcpClientData
-{
-    async fn handle(
-        &self,
-        connection_event: ConnectionEvent<
-            my_service_bus_tcp_shared::TcpContract,
-            MySbTcpSerializer,
-            MySbSerializerMetadata,
-        >,
-    ) {
-        match connection_event {
-            ConnectionEvent::Connected(connection) => {
-                super::new_connection_handler::send_greeting(
-                    &connection,
-                    self.app_name.as_str(),
-                    self.app_version.as_str(),
-                    self.client_version.as_str(),
-                )
-                .await;
-
-                super::new_connection_handler::send_packet_versions(&connection).await;
-
-                self.publishers.new_connection(connection.clone()).await;
-                self.subscribers.new_connection(connection.clone()).await;
-
-                self.has_connection
-                    .store(true, std::sync::atomic::Ordering::SeqCst);
-            }
-            ConnectionEvent::Disconnected(_) => {
-                self.has_connection
-                    .store(false, std::sync::atomic::Ordering::SeqCst);
-                self.publishers.disconnect().await;
-                self.subscribers.disconnect().await;
-            }
-            ConnectionEvent::Payload {
-                connection,
-                payload,
-            } => self.new_incoming_data(connection, payload).await,
         }
     }
 }

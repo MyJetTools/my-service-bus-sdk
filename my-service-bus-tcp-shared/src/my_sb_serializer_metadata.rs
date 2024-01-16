@@ -1,8 +1,8 @@
+use my_tcp_sockets::{TcpSerializerMetadata, TcpSerializerMetadataFactory};
+
 use crate::{TcpContract, TcpProtocolVersion};
 
 use super::PacketVersions;
-
-use my_tcp_sockets::TcpSerializationMetadata;
 
 pub const DEFAULT_TCP_PROTOCOL_VERSION: i32 = 3;
 #[derive(Debug, Clone)]
@@ -52,7 +52,7 @@ impl MySbSerializerMetadata {
     }
 }
 
-impl TcpSerializationMetadata<TcpContract> for MySbSerializerMetadata {
+impl TcpSerializerMetadata<TcpContract> for MySbSerializerMetadata {
     fn is_tcp_contract_related_to_metadata(&self, contract: &TcpContract) -> bool {
         match contract {
             TcpContract::Greeting {
@@ -77,6 +77,16 @@ impl TcpSerializationMetadata<TcpContract> for MySbSerializerMetadata {
             }
             _ => {}
         }
+    }
+}
+
+pub struct SbTcpSerializerMetadataFactory;
+#[async_trait::async_trait]
+impl TcpSerializerMetadataFactory<TcpContract, MySbSerializerMetadata>
+    for SbTcpSerializerMetadataFactory
+{
+    async fn create(&self) -> MySbSerializerMetadata {
+        MySbSerializerMetadata::default()
     }
 }
 
