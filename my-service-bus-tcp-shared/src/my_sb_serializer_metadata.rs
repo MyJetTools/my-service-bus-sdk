@@ -80,11 +80,11 @@ impl TcpSerializerState<MySbTcpContract> for MySbSerializerState {
     }
 }
 
-pub struct SbTcpSerializerMetadataFactory;
+pub struct MySbSerializerFactory;
 
 #[async_trait::async_trait]
 impl TcpSerializerFactory<MySbTcpContract, MySbTcpSerializer, MySbSerializerState>
-    for SbTcpSerializerMetadataFactory
+    for MySbSerializerFactory
 {
     async fn create_serializer(&self) -> MySbTcpSerializer {
         MySbTcpSerializer::default()
