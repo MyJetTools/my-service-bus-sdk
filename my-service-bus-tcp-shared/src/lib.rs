@@ -20,5 +20,5 @@ pub use tcp_protocol_version::*;
 pub type MySbTcpConnection = my_tcp_sockets::tcp_connection::TcpSocketConnection<
     MySbTcpContract,
     MySbTcpSerializer,
-    MySbSerializerMetadata,
+    MySbSerializerState,
 >;

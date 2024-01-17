@@ -4,9 +4,8 @@ use my_service_bus_abstractions::{
     MySbMessage, MyServiceBusSubscriberClient, MyServiceBusSubscriberClientCallback,
 };
 
-use my_service_bus_tcp_shared::{MySbSerializerMetadata, MySbTcpContract, MySbTcpSerializer};
+use my_service_bus_tcp_shared::{MySbTcpConnection, MySbTcpContract};
 
-use my_tcp_sockets::tcp_connection::TcpSocketConnection;
 use tokio::sync::Mutex;
 
 use super::MySbSubscribersData;
@@ -67,12 +66,7 @@ impl MySbSubscribers {
         result
     }
 
-    pub async fn new_connection(
-        &self,
-        connection: Arc<
-            TcpSocketConnection<MySbTcpContract, MySbTcpSerializer, MySbSerializerMetadata>,
-        >,
-    ) {
+    pub async fn new_connection(&self, connection: Arc<MySbTcpConnection>) {
         {
             let mut write_access = self.subscribers.lock().await;
             write_access.connection = Some(connection.clone());

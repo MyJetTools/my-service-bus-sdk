@@ -53,11 +53,11 @@ mod tests {
     use my_service_bus_abstractions::{MySbMessage, SbMessageHeaders};
 
     use super::*;
-    use crate::{tcp_message_id::NEW_MESSAGES, MySbSerializerMetadata, MySbTcpContract};
+    use crate::{tcp_message_id::NEW_MESSAGES, MySbSerializerState, MySbTcpContract};
 
     #[tokio::test]
     async fn test_basic_use_case_v2() {
-        let mut metadata = MySbSerializerMetadata::new(2);
+        let mut metadata = MySbSerializerState::new(2);
         metadata.versions.set_packet_version(NEW_MESSAGES, 1);
 
         let headers = SbMessageHeaders::new().add("1", "1").add("2", "2");
@@ -120,7 +120,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_basic_use_case_v3() {
-        let mut metadata = MySbSerializerMetadata::new(3);
+        let mut metadata = MySbSerializerState::new(3);
         metadata.versions.set_packet_version(NEW_MESSAGES, 1);
 
         let headers = SbMessageHeaders::new().add("1", "1").add("2", "2");

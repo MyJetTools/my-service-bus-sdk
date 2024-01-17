@@ -1,7 +1,7 @@
 use std::sync::{atomic::AtomicBool, Arc};
 
 use my_service_bus_tcp_shared::{
-    MySbSerializerMetadata, MySbTcpConnection, MySbTcpContract, MySbTcpSerializer,
+    MySbSerializerState, MySbTcpConnection, MySbTcpContract, MySbTcpSerializer,
 };
 use rust_extensions::{Logger, StrOrString};
 
@@ -18,7 +18,7 @@ pub struct TcpClientData {
 }
 
 #[async_trait::async_trait]
-impl my_tcp_sockets::SocketEventCallback<MySbTcpContract, MySbTcpSerializer, MySbSerializerMetadata>
+impl my_tcp_sockets::SocketEventCallback<MySbTcpContract, MySbTcpSerializer, MySbSerializerState>
     for TcpClientData
 {
     async fn connected(&self, connection: Arc<MySbTcpConnection>) {

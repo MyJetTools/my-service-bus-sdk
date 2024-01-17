@@ -7,7 +7,7 @@ use my_tcp_sockets::{
     TcpWriteBuffer,
 };
 
-use crate::MySbSerializerMetadata;
+use crate::MySbSerializerState;
 
 use super::tcp_message_id::*;
 
@@ -89,7 +89,7 @@ pub enum MySbTcpContract {
 impl MySbTcpContract {
     pub async fn deserialize<TSocketReader: SocketReader + Send + Sync + 'static>(
         socket_reader: &mut TSocketReader,
-        serializer_metadata: &MySbSerializerMetadata,
+        serializer_metadata: &MySbSerializerState,
     ) -> Result<MySbTcpContract, ReadingTcpContractFail> {
         let packet_no = socket_reader.read_byte().await?;
 
@@ -323,7 +323,7 @@ impl MySbTcpContract {
     pub fn serialize(
         &self,
         write_buffer: &mut impl TcpWriteBuffer,
-        serializer_metadata: &MySbSerializerMetadata,
+        serializer_metadata: &MySbSerializerState,
     ) {
         match self {
             MySbTcpContract::Ping {} => {
@@ -568,11 +568,11 @@ mod tests {
 
         let mut serialized_data = Vec::new();
 
-        let metadata = MySbSerializerMetadata::new(2);
+        let metadata = MySbSerializerState::new(2);
         tcp_packet.serialize(&mut serialized_data, &metadata);
 
         let mut socket_reader = SocketReaderInMem::new(serialized_data);
-        let attr = MySbSerializerMetadata::new(0);
+        let attr = MySbSerializerState::new(0);
 
         let result = MySbTcpContract::deserialize(&mut socket_reader, &attr)
             .await
@@ -592,11 +592,11 @@ mod tests {
 
         let mut serialized_data: Vec<u8> = Vec::new();
 
-        let metadata = MySbSerializerMetadata::new(2);
+        let metadata = MySbSerializerState::new(2);
         tcp_packet.serialize(&mut serialized_data, &metadata);
 
         let mut socket_reader = SocketReaderInMem::new(serialized_data);
-        let attr = MySbSerializerMetadata::new(0);
+        let attr = MySbSerializerState::new(0);
 
         let result = MySbTcpContract::deserialize(&mut socket_reader, &attr)
             .await
@@ -621,12 +621,12 @@ mod tests {
         };
 
         let mut serialized_data: Vec<u8> = Vec::new();
-        let metadata = MySbSerializerMetadata::new(0);
+        let metadata = MySbSerializerState::new(0);
         tcp_packet.serialize(&mut serialized_data, &metadata);
 
         let mut socket_reader = SocketReaderInMem::new(serialized_data);
 
-        let attr = MySbSerializerMetadata::new(0);
+        let attr = MySbSerializerState::new(0);
 
         let result = MySbTcpContract::deserialize(&mut socket_reader, &attr)
             .await
@@ -667,7 +667,7 @@ mod tests {
             request_id: request_id_test,
             topic_id: topic_test,
         };
-        let attr = MySbSerializerMetadata::new(PROTOCOL_VERSION);
+        let attr = MySbSerializerState::new(PROTOCOL_VERSION);
 
         let mut serialized_data: Vec<u8> = Vec::new();
 
@@ -728,7 +728,7 @@ mod tests {
             topic_id: topic_test,
         };
 
-        let attr = MySbSerializerMetadata::new(PROTOCOL_VERSION);
+        let attr = MySbSerializerState::new(PROTOCOL_VERSION);
         let mut serialized_data: Vec<u8> = Vec::new();
         tcp_packet.serialize(&mut serialized_data, &attr);
 
@@ -779,7 +779,7 @@ mod tests {
             request_id: request_id_test,
         };
 
-        let attr = MySbSerializerMetadata::new(PROTOCOL_VERSION);
+        let attr = MySbSerializerState::new(PROTOCOL_VERSION);
 
         let mut serialized_data: Vec<u8> = Vec::new();
         tcp_packet.serialize(&mut serialized_data, &attr);
@@ -813,7 +813,7 @@ mod tests {
             queue_type: queue_type_test,
         };
 
-        let attr = MySbSerializerMetadata::new(PROTOCOL_VERSION.into());
+        let attr = MySbSerializerState::new(PROTOCOL_VERSION.into());
         let mut serialized_data: Vec<u8> = Vec::new();
         tcp_packet.serialize(&mut serialized_data, &attr);
 

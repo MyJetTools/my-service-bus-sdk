@@ -3,8 +3,7 @@ use std::sync::Arc;
 use my_service_bus_abstractions::{
     publisher::MessageToPublish, MyServiceBusPublisherClient, PublishError,
 };
-use my_service_bus_tcp_shared::{MySbSerializerMetadata, MySbTcpContract, MySbTcpSerializer};
-use my_tcp_sockets::tcp_connection::TcpSocketConnection;
+use my_service_bus_tcp_shared::{MySbTcpConnection, MySbTcpContract};
 use tokio::sync::Mutex;
 
 use super::{MySbPublisherData, PublishProcessByConnection};
@@ -26,12 +25,7 @@ impl MySbPublishers {
         write_access.confirm(request_id).await;
     }
 
-    pub async fn new_connection(
-        &self,
-        connection: Arc<
-            TcpSocketConnection<MySbTcpContract, MySbTcpSerializer, MySbSerializerMetadata>,
-        >,
-    ) {
+    pub async fn new_connection(&self, connection: Arc<MySbTcpConnection>) {
         {
             let mut write_access = self.data.lock().await;
             write_access.connection = Some(PublishProcessByConnection::new(connection.clone()));

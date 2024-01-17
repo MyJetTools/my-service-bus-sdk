@@ -1,6 +1,6 @@
-use my_tcp_sockets::{TcpSerializerMetadata, TcpSerializerMetadataFactory};
+use my_tcp_sockets::{TcpSerializerFactory, TcpSerializerState};
 
-use crate::{MySbTcpContract, TcpProtocolVersion};
+use crate::{MySbTcpContract, MySbTcpSerializer, TcpProtocolVersion};
 
 use super::PacketVersions;
 
@@ -12,12 +12,12 @@ pub struct PacketProtVer {
 }
 
 #[derive(Clone)]
-pub struct MySbSerializerMetadata {
+pub struct MySbSerializerState {
     pub versions: PacketVersions,
     pub tcp_protocol_version: TcpProtocolVersion,
 }
 
-impl Default for MySbSerializerMetadata {
+impl Default for MySbSerializerState {
     #[cfg(not(feature = "tcp-client"))]
     fn default() -> Self {
         Self::new(0)
@@ -33,7 +33,7 @@ impl Default for MySbSerializerMetadata {
     }
 }
 
-impl MySbSerializerMetadata {
+impl MySbSerializerState {
     pub fn new(tcp_protocol_version: i32) -> Self {
         Self {
             versions: PacketVersions::new(),
@@ -52,7 +52,7 @@ impl MySbSerializerMetadata {
     }
 }
 
-impl TcpSerializerMetadata<MySbTcpContract> for MySbSerializerMetadata {
+impl TcpSerializerState<MySbTcpContract> for MySbSerializerState {
     fn is_tcp_contract_related_to_metadata(&self, contract: &MySbTcpContract) -> bool {
         match contract {
             MySbTcpContract::Greeting {
@@ -81,12 +81,16 @@ impl TcpSerializerMetadata<MySbTcpContract> for MySbSerializerMetadata {
 }
 
 pub struct SbTcpSerializerMetadataFactory;
+
 #[async_trait::async_trait]
-impl TcpSerializerMetadataFactory<MySbTcpContract, MySbSerializerMetadata>
+impl TcpSerializerFactory<MySbTcpContract, MySbTcpSerializer, MySbSerializerState>
     for SbTcpSerializerMetadataFactory
 {
-    async fn create(&self) -> MySbSerializerMetadata {
-        MySbSerializerMetadata::default()
+    async fn create_serializer(&self) -> MySbTcpSerializer {
+        MySbTcpSerializer::default()
+    }
+    async fn create_serializer_state(&self) -> MySbSerializerState {
+        MySbSerializerState::default()
     }
 }
 
@@ -95,7 +99,7 @@ mod test {
 
     #[test]
     fn metadata() {
-        let a = std::mem::size_of::<super::MySbSerializerMetadata>();
+        let a = std::mem::size_of::<super::MySbSerializerState>();
 
         println!("Size of metadata: {}", a);
     }

@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
 use my_service_bus_tcp_shared::{
-    MySbSerializerMetadata, MySbTcpContract, MySbTcpSerializer, DEFAULT_TCP_PROTOCOL_VERSION,
+    MySbSerializerState, MySbTcpContract, MySbTcpSerializer, DEFAULT_TCP_PROTOCOL_VERSION,
 };
 use my_tcp_sockets::tcp_connection::TcpSocketConnection;
 
 pub async fn send_greeting(
-    socket_ctx: &TcpSocketConnection<MySbTcpContract, MySbTcpSerializer, MySbSerializerMetadata>,
+    socket_ctx: &TcpSocketConnection<MySbTcpContract, MySbTcpSerializer, MySbSerializerState>,
     app_name: &str,
     app_version: &str,
     client_version: &str,
@@ -20,7 +20,7 @@ pub async fn send_greeting(
 }
 
 pub async fn send_packet_versions(
-    socket_ctx: &TcpSocketConnection<MySbTcpContract, MySbTcpSerializer, MySbSerializerMetadata>,
+    socket_ctx: &TcpSocketConnection<MySbTcpContract, MySbTcpSerializer, MySbSerializerState>,
 ) {
     let mut packet_versions = HashMap::new();
     packet_versions.insert(my_service_bus_tcp_shared::tcp_message_id::NEW_MESSAGES, 1);
