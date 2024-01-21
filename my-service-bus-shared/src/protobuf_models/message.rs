@@ -1,6 +1,6 @@
 use my_service_bus_abstractions::MessageId;
 use prost::{DecodeError, EncodeError};
-use rust_extensions::date_time::DateTimeAsMicroseconds;
+use rust_extensions::{date_time::DateTimeAsMicroseconds, sorted_vec::EntityWithKey};
 
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MessageProtobufModel {
@@ -12,6 +12,12 @@ pub struct MessageProtobufModel {
     pub data: Vec<u8>,
     #[prost(message, repeated, tag = "4")]
     pub headers: Vec<MessageMetaDataProtobufModel>,
+}
+
+impl EntityWithKey<i64> for MessageProtobufModel {
+    fn get_key(&self) -> &i64 {
+        &self.message_id
+    }
 }
 
 impl MessageProtobufModel {
