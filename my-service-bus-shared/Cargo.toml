@@ -9,7 +9,7 @@ edition = "2021"
 rust-extensions = { tag = "0.1.4", git = "https://github.com/MyJetTools/rust-extensions.git" }
 my-service-bus-abstractions = { path = "../my-service-bus-abstractions" }
 
-zip = "*"
+zip = "0"
 prost = "*"
 prost-types = "*"
 chrono = "*"
