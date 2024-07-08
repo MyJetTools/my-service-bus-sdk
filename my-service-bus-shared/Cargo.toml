@@ -11,6 +11,6 @@ my-service-bus-abstractions = { path = "../my-service-bus-abstractions" }
 
 zip = "0"
 prost = "0.12"
-prost-types = "*"
+prost-types = "0.12"
 chrono = "*"
 tokio = { version = "*", features = ["full"] }
