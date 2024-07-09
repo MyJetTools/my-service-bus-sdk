@@ -10,7 +10,7 @@ rust-extensions = { tag = "0.1.4", git = "https://github.com/MyJetTools/rust-ext
 my-service-bus-abstractions = { path = "../my-service-bus-abstractions" }
 
 zip = "0"
-prost = "0.12"
-prost-types = "0.12"
+prost = "*"
+prost-types = "*"
 chrono = "*"
 tokio = { version = "*", features = ["full"] }
