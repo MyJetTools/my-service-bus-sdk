@@ -9,3 +9,5 @@ pub mod sub_page;
 
 pub mod debug;
 pub mod validators;
+
+pub extern crate zip;
