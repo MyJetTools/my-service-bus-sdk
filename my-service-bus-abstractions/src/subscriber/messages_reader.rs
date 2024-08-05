@@ -16,6 +16,7 @@ pub struct MessagesReader<TMessageModel: MySbMessageDeserializer<Item = TMessage
     messages: Option<VecDeque<MySbDeliveredMessage<TMessageModel>>>,
     pub confirmation_id: i64,
     delivered: QueueWithIntervals,
+    not_delivered: QueueWithIntervals,
     connection_id: i32,
     current_message: CurrentMessage<TMessageModel>,
 }
@@ -36,13 +37,17 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
             total_messages_amount,
             connection_id,
             current_message: CurrentMessage::None,
+            not_delivered: QueueWithIntervals::new(),
         }
     }
 
     fn handled_ok(&mut self, msg: &mut MySbDeliveredMessage<TMessageModel>) {
         #[cfg(feature = "with-telemetry")]
         msg.my_telemetry.enabled_duration_tracking_on_confirmation();
-        self.delivered.enqueue(msg.id.get_value());
+
+        if !self.not_delivered.has_message(msg.id.get_value()) {
+            self.delivered.enqueue(msg.id.get_value());
+        }
     }
 
     fn handle_current_messages_as_ok(&mut self) {
@@ -66,6 +71,11 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
         let next_message = messages.pop_front()?;
         self.current_message = CurrentMessage::Single(next_message);
         Some(self.current_message.unwrap_as_single_message_mut())
+    }
+
+    pub fn mark_as_not_delivered(&mut self, message_id: i64) {
+        self.not_delivered.enqueue(message_id);
+        let _ = self.delivered.remove(message_id);
     }
 
     pub fn get_all<'s>(
