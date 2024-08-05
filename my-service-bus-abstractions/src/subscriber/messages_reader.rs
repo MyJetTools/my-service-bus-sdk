@@ -98,19 +98,23 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> Drop
     for MessagesReader<TMessageModel>
 {
     fn drop(&mut self) {
+        let mut debug = false;
         if let Ok(debug_topic) = std::env::var("DEBUG_TOPIC") {
             if debug_topic == self.data.topic_id.as_str() {
-                println!(
-                    "Confirmation: Topic: {}, Queue:{}, Total Amount: {}, Delivered Amount: {},  Not Delivered amount: {}",
-                    self.data.topic_id.as_str(),
-                    self.data.queue_id.as_str(),
-                    self.total_messages_amount,
-                    self.delivered.queue_size(),
-                    self.not_delivered.queue_size()
-                );
+                debug = true;
             }
         };
 
+        if debug {
+            println!(
+                "Confirmation: Topic: {}, Queue:{}, Total Amount: {}, Delivered Amount: {},  Not Delivered amount: {}",
+                self.data.topic_id.as_str(),
+                self.data.queue_id.as_str(),
+                self.total_messages_amount,
+                self.delivered.queue_size(),
+                self.not_delivered.queue_size()
+            );
+        }
         if self.delivered.queue_size() == self.total_messages_amount {
             self.data.client.confirm_delivery(
                 self.data.topic_id.as_str(),
@@ -119,6 +123,10 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> Drop
                 self.connection_id,
                 true,
             );
+
+            if debug {
+                println!("All messages confirmed as Delivered")
+            }
         } else if self.delivered.queue_size() == 0 {
             let mut log_context = HashMap::new();
             log_context.insert(
@@ -148,6 +156,10 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> Drop
                 self.connection_id,
                 false,
             );
+
+            if debug {
+                println!("All messages confirmed as not Delivered")
+            }
         } else {
             let mut log_context = HashMap::new();
             log_context.insert(
@@ -180,6 +192,13 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> Drop
                 self.connection_id,
                 self.delivered.get_snapshot(),
             );
+
+            if debug {
+                println!(
+                    "Some messages {:?} confirmed as not Delivered",
+                    self.delivered.get_snapshot()
+                )
+            }
         };
     }
 }
