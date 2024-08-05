@@ -98,6 +98,19 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> Drop
     for MessagesReader<TMessageModel>
 {
     fn drop(&mut self) {
+        if let Ok(debug_topic) = std::env::var("DEBUG_TOPIC") {
+            if debug_topic == self.data.topic_id.as_str() {
+                println!(
+                    "Confirmation: Topic: {}, Queue:{}, Total Amount: {}, Delivered Amount: {},  Not Delivered amount: {}",
+                    self.data.topic_id.as_str(),
+                    self.data.queue_id.as_str(),
+                    self.total_messages_amount,
+                    self.delivered.queue_size(),
+                    self.not_delivered.queue_size()
+                );
+            }
+        };
+
         if self.delivered.queue_size() == self.total_messages_amount {
             self.data.client.confirm_delivery(
                 self.data.topic_id.as_str(),
