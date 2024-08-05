@@ -6,6 +6,7 @@ use std::{
 use crate::{
     queue_with_intervals::QueueWithIntervals,
     subscriber::{MySbDeliveredMessage, MySbMessageDeserializer},
+    MessageId,
 };
 
 use super::{CurrentMessage, SubscriberData};
@@ -73,7 +74,8 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
         Some(self.current_message.unwrap_as_single_message_mut())
     }
 
-    pub fn mark_as_not_delivered(&mut self, message_id: i64) {
+    pub fn mark_as_not_delivered(&mut self, message_id: MessageId) {
+        let message_id = message_id.get_value();
         self.not_delivered.enqueue(message_id);
         let _ = self.delivered.remove(message_id);
     }
