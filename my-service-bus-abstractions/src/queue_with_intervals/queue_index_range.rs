@@ -64,7 +64,7 @@ impl QueueIndexRange {
 
     pub fn is_my_interval_to_remove(&self, id: i64) -> bool {
         if self.is_empty() {
-            panic!("We are trying to find interval to remove but we bumped empty interval");
+            panic!("MyServiceBus. We are trying to find interval to remove but we bumped empty interval");
         }
 
         id >= self.from_id && id <= self.to_id

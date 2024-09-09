@@ -69,7 +69,7 @@ impl MySbPublishers {
                 return;
             }
 
-            println!("Trying to restore connection");
+            println!("Trying to restore connection to MyServiceBus");
 
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
