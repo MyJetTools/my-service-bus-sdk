@@ -64,12 +64,10 @@ impl DeliveredMessageTelemetry {
         if self.event_duration_tracker.is_none() {
             if let Some(telemetry_event_name) = self.telemetry_event_name.take() {
                 let mut event_duration_tracker =
-                    self.ctx.start_event_tracking(telemetry_event_name);
-
-                event_duration_tracker.add_tag(
-                    "msg_id".to_string(),
-                    self.message_id.get_value().to_string(),
-                );
+                    self.ctx.start_event_tracking(telemetry_event_name).add_tag(
+                        "msg_id".to_string(),
+                        self.message_id.get_value().to_string(),
+                    );
 
                 event_duration_tracker.ignore_this_event();
 
@@ -85,12 +83,9 @@ impl DeliveredMessageTelemetry {
         key: impl Into<StrOrString<'static>>,
         value: impl Into<StrOrString<'static>>,
     ) {
-        match self.event_duration_tracker.as_mut() {
+        match self.event_duration_tracker.take() {
             Some(event_duration_tracker) => {
-                let key: StrOrString<'static> = key.into();
-                let value: StrOrString<'static> = value.into();
-
-                event_duration_tracker.add_tag(key.to_string(), value.to_string());
+                self.event_duration_tracker = Some(event_duration_tracker.add_tag(key, value));
             }
             None => {
                 panic!("Telemetry is not engaged. Please call engage_telemetry before adding tags")
