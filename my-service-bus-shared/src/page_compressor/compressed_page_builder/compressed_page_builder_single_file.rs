@@ -24,7 +24,7 @@ impl CompressedPageBuilderSingleFile {
         self.messages.as_mut().unwrap().push(model.clone());
     }
 
-    pub fn get_payload(&mut self) -> Result<Vec<u8>, CompressedPageWriterError> {
+    pub fn get_payload(mut self) -> Result<Vec<u8>, CompressedPageWriterError> {
         let messages = self.messages.take().unwrap();
 
         let messages = MessagesProtobufModel { messages };
@@ -38,7 +38,7 @@ impl CompressedPageBuilderSingleFile {
         {
             let mut zip = zip::ZipWriter::new(&mut writer);
 
-            let options = zip::write::FileOptions::default()
+            let options = zip::write::SimpleFileOptions::default()
                 .compression_method(zip::CompressionMethod::Deflated);
 
             zip.start_file("d", options)?;

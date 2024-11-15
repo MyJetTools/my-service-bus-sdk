@@ -6,15 +6,12 @@ use super::CompressedPageWriterError;
 
 pub struct CompressedPageBuilderByFiles {
     zip_writer: zip::ZipWriter<VecWriter>,
-    options: zip::write::FileOptions,
 }
 
 impl CompressedPageBuilderByFiles {
     pub fn new() -> Self {
         let result = Self {
             zip_writer: zip::ZipWriter::new(VecWriter::new()),
-            options: zip::write::FileOptions::default()
-                .compression_method(zip::CompressionMethod::Deflated),
         };
 
         result
@@ -34,7 +31,10 @@ impl CompressedPageBuilderByFiles {
         #[cfg(test)]
         println!("{}: {}", file_name, payload.len());
 
-        self.zip_writer.start_file(file_name, self.options)?;
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+
+        self.zip_writer.start_file(file_name, options)?;
 
         let mut pos = 0;
         while pos < payload.len() {
@@ -46,7 +46,7 @@ impl CompressedPageBuilderByFiles {
         Ok(())
     }
 
-    pub fn get_payload(&mut self) -> Result<Vec<u8>, CompressedPageWriterError> {
+    pub fn get_payload(self) -> Result<Vec<u8>, CompressedPageWriterError> {
         let result = self.zip_writer.finish()?;
         Ok(result.buf)
     }

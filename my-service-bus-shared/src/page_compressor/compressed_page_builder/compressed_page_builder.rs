@@ -31,7 +31,7 @@ impl CompressedPageBuilder {
         }
     }
 
-    pub fn get_payload(&mut self) -> Result<Vec<u8>, CompressedPageWriterError> {
+    pub fn get_payload(self) -> Result<Vec<u8>, CompressedPageWriterError> {
         match self {
             CompressedPageBuilder::SingleFile(single_file) => single_file.get_payload(),
             CompressedPageBuilder::ByFiles(by_files) => by_files.get_payload(),
