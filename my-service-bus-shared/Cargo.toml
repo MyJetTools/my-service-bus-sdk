@@ -1,12 +1,12 @@
 [package]
 name = "my-service-bus-shared"
-version = "1.1.0"
+version = "1.1.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rust-extensions = { tag = "0.1.4", git = "https://github.com/MyJetTools/rust-extensions.git" }
+rust-extensions = { tag = "0.1.5", git = "https://github.com/MyJetTools/rust-extensions.git" }
 my-service-bus-abstractions = { path = "../my-service-bus-abstractions" }
 
 zip = { version = "*", features = ["deflate"] }

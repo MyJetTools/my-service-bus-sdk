@@ -1,6 +1,6 @@
 [package]
 name = "my-service-bus-tcp-client"
-version = "1.1.0"
+version = "1.1.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,8 +11,8 @@ my-service-bus-shared = { path = "../my-service-bus-shared" }
 my-service-bus-tcp-shared = { path = "../my-service-bus-tcp-shared", features = [
     "tcp-client",
 ] }
-my-tcp-sockets = { tag = "0.1.9", git = "https://github.com/MyJetTools/my-tcp-sockets.git" }
-rust-extensions = { tag = "0.1.4", git = "https://github.com/MyJetTools/rust-extensions.git" }
+my-tcp-sockets = { tag = "0.1.11", git = "https://github.com/MyJetTools/my-tcp-sockets.git" }
+rust-extensions = { tag = "0.1.5", git = "https://github.com/MyJetTools/rust-extensions.git" }
 
 tokio = { version = "*", features = ["full"] }
 tokio-util = "*"

@@ -12,7 +12,7 @@ use my_service_bus_abstractions::subscriber::SubscriberCallback;
 use my_service_bus_abstractions::subscriber::TopicQueueType;
 use my_service_bus_abstractions::{GetMySbModelTopicId, MySbMessageSerializer};
 use my_service_bus_tcp_shared::MySbSerializerFactory;
-use my_tcp_sockets::{TcpClient, TcpClientSocketSettings};
+use my_tcp_sockets::{TcpClient, TcpClientSocketSettings, TlsSettings};
 use rust_extensions::{Logger, StrOrString};
 
 use super::MyServiceBusSettings;
@@ -33,6 +33,10 @@ impl TcpConnectionSettings {
 impl TcpClientSocketSettings for TcpConnectionSettings {
     async fn get_host_port(&self) -> Option<String> {
         self.my_sb_settings.get_host_port().await.into()
+    }
+
+    async fn get_tls_settings(&self) -> Option<TlsSettings> {
+        None
     }
 }
 

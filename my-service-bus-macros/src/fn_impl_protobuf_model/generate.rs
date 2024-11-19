@@ -6,9 +6,9 @@ pub fn generate(attr: TokenStream, input: TokenStream) -> Result<proc_macro::Tok
     let ast: syn::DeriveInput = syn::parse(input).unwrap();
 
     let attr:proc_macro2::TokenStream = attr.into();
-    let attrs = TokensObject::new(attr.into(), &||None)?;
+    let attrs = TokensObject::new(attr.into())?;
 
-    let topic_id:&str = attrs.get_from_single_or_named("topic_id")?.try_into()?;
+    let topic_id:&str = attrs.get_value_from_single_or_named("topic_id")?.try_into()?;
 
     let struct_name = &ast.ident;
 
