@@ -1,4 +1,4 @@
-use rust_extensions::{AsSliceOrVec, SliceOrVecSeqReader};
+use rust_extensions::{SliceOrVec, SliceOrVecSeqReader};
 
 use crate::protobuf_models::MessageProtobufModel;
 
@@ -12,8 +12,8 @@ pub enum CompressedPageReader<'s> {
 }
 
 impl<'s> CompressedPageReader<'s> {
-    pub fn new(zipped: impl Into<AsSliceOrVec<'s, u8>>) -> Result<Self, CompressedPageReaderError> {
-        let zipped: AsSliceOrVec<'_, u8> = zipped.into();
+    pub fn new(zipped: impl Into<SliceOrVec<'s, u8>>) -> Result<Self, CompressedPageReaderError> {
+        let zipped: SliceOrVec<'_, u8> = zipped.into();
 
         let zipped: SliceOrVecSeqReader<'_, u8> = zipped.into();
 
