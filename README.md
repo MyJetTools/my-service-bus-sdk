@@ -118,3 +118,14 @@ impl SubscriberCallback for MySbSubscriber {
     }
 }
 ```
+
+
+### How to Ignore Message
+
+There are situation when message can not be delivered and has to be ignore.
+
+Please Set environment variable
+```env
+SB_IGNORE_MESSAGE:  TOPIC_ID=xxx;QUEUE_ID=xxx;MESSAGE_ID=xxx
+zzz
+
