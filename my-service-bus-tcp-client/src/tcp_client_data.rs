@@ -5,7 +5,7 @@ use my_service_bus_tcp_shared::{
 };
 use rust_extensions::{Logger, StrOrString};
 
-use crate::{publishers::MySbPublishers, subscribers::MySbSubscribers};
+use crate::{publishers::MySbPublishers, subscribers::MySbSubscribers, IgnoreMessage};
 
 pub struct TcpClientData {
     pub app_name: StrOrString<'static>,
@@ -15,6 +15,7 @@ pub struct TcpClientData {
     pub subscribers: Arc<MySbSubscribers>,
     pub logger: Arc<dyn Logger + Send + Sync + 'static>,
     pub has_connection: Arc<AtomicBool>,
+    pub ignore_message: Option<IgnoreMessage>,
 }
 
 #[async_trait::async_trait]
@@ -55,8 +56,18 @@ impl my_tcp_sockets::SocketEventCallback<MySbTcpContract, MySbTcpSerializer, MyS
                 topic_id,
                 queue_id,
                 confirmation_id,
-                messages,
+                mut messages,
             } => {
+                if let Some(auto_confirm_message) = self.ignore_message.as_ref() {
+                    if auto_confirm_message.topic_id == topic_id
+                        && auto_confirm_message.queue_id == queue_id
+                    {
+                        messages.retain(|itm| {
+                            itm.id.get_value() != auto_confirm_message.message_id.get_value()
+                        });
+                    }
+                }
+
                 self.subscribers
                     .new_messages(topic_id, queue_id, confirmation_id, connection.id, messages)
                     .await

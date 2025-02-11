@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::publishers::MySbPublishers;
 use crate::subscribers::MySbSubscribers;
 
-use crate::TcpClientData;
+use crate::{IgnoreMessage, TcpClientData};
 use my_service_bus_abstractions::publisher::{MyServiceBusPublisher, PublisherWithInternalQueue};
 use my_service_bus_abstractions::subscriber::MySbMessageDeserializer;
 use my_service_bus_abstractions::subscriber::Subscriber;
@@ -62,6 +62,7 @@ impl MyServiceBusClient {
             app_name: app_name.into(),
             app_version: app_version.into(),
             client_version: get_client_version(),
+            ignore_message: IgnoreMessage::new(),
         };
 
         Self {
