@@ -80,6 +80,10 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
         let _ = self.delivered.remove(message_id);
     }
 
+    pub fn force_mark_as_delivered(&mut self) {
+        self.handle_current_messages_as_ok();
+    }
+
     pub fn get_all<'s>(
         &'s mut self,
     ) -> Option<std::collections::vec_deque::IterMut<'s, MySbDeliveredMessage<TMessageModel>>> {
