@@ -1,9 +1,8 @@
-use crate::queue_with_intervals::queue_index_range::{QueueIndexRange, RemoveResult};
+use crate::queue_with_intervals::queue_index_range::QueueIndexRange;
 
-use super::{
-    iterator::QueueWithIntervalsIterator, queue_index_range::QueueIndexRangeCompare,
-    QueueWithIntervalsInner, QueueWithIntervalsInnerIterator,
-};
+use super::{iterator::QueueWithIntervalsIterator, *};
+
+//Illustrations are https://docs.google.com/spreadsheets/d/1oRFoiUkPm3h8Tz3BSVNCSBG3_pM84MlZLpJDCAPGKLs/edit?gid=0#gid=0
 
 #[derive(Debug, Clone)]
 pub enum QueueWithIntervalsError {
@@ -13,418 +12,545 @@ pub enum QueueWithIntervalsError {
 
 #[derive(Debug, Clone)]
 pub struct QueueWithIntervals {
-    inner: QueueWithIntervalsInner,
+    intervals: Vec<QueueIndexRange>,
 }
 
 impl QueueWithIntervals {
     pub fn new() -> QueueWithIntervals {
         Self {
-            inner: QueueWithIntervalsInner::new(0),
+            intervals: vec![QueueIndexRange::new_empty(0)],
         }
     }
 
-    pub fn restore(intervals: Vec<QueueIndexRange>) -> Self {
-        Self {
-            inner: QueueWithIntervalsInner::restore(intervals),
-        }
+    pub fn get_interval(&self, index: usize) -> Option<&QueueIndexRange> {
+        self.intervals.get(index)
+    }
+
+    pub fn restore(mut intervals: Vec<QueueIndexRange>) -> Self {
+        intervals.sort_by_key(|itm| itm.from_id);
+        Self { intervals }
     }
 
     pub fn from_single_interval(from_id: i64, to_id: i64) -> Self {
         Self {
-            inner: QueueWithIntervalsInner::from_single_interval(from_id, to_id),
+            intervals: vec![QueueIndexRange { from_id, to_id }],
         }
     }
 
-    pub fn reset(&mut self, intervals: Vec<QueueIndexRange>) {
-        self.inner.reset(intervals);
+    pub fn reset(&mut self, mut intervals: Vec<QueueIndexRange>) {
+        intervals.sort_by_key(|itm| itm.from_id);
+        self.intervals = intervals;
     }
 
     pub fn clean(&mut self) {
-        self.inner.clean();
+        self.intervals.truncate(1);
+        self.intervals.get_mut(0).unwrap().reset();
     }
 
     pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
+        if self.intervals.len() == 1 {
+            return self.intervals.get(0).unwrap().is_empty();
+        }
+
+        false
     }
 
-    pub fn remove(&mut self, id: i64) -> Result<(), QueueWithIntervalsError> {
+    pub fn remove(&mut self, value: i64) -> Result<(), QueueWithIntervalsError> {
         if self.is_empty() {
             return Err(QueueWithIntervalsError::QueueIsEmpty);
         }
 
-        for index in 0..self.inner.intervals_amount() {
-            if let Some(item) = self.inner.get_mut(index) {
-                if item.is_in_my_interval(id) {
-                    match item.remove(id) {
-                        RemoveResult::NoUpdate => return Ok(()),
-                        RemoveResult::InsertNew(new_item) => {
-                            self.inner.insert(index + 1, new_item);
-                            return Ok(());
-                        }
-                        RemoveResult::RemoveItem => {
-                            self.inner.remove(index);
-                            return Ok(());
-                        }
-                    }
+        let mut index = 0;
+        let mut split = None;
+
+        let mut removed = false;
+        for interval in &mut self.intervals {
+            if interval.is_in_my_interval(value) {
+                if interval.from_id == value {
+                    interval.from_id += 1;
+                    removed = true;
+                    break;
                 }
+
+                if interval.to_id == value {
+                    interval.to_id -= 1;
+                    removed = true;
+                    break;
+                }
+
+                split = Some((
+                    QueueIndexRange {
+                        from_id: interval.from_id,
+                        to_id: value - 1,
+                    },
+                    QueueIndexRange {
+                        from_id: value + 1,
+                        to_id: interval.to_id,
+                    },
+                ));
+
+                removed = true;
+                break;
+            }
+            index += 1;
+        }
+
+        if let Some(split) = split {
+            self.intervals[index] = split.0;
+            self.intervals.insert(index + 1, split.1);
+            return Ok(());
+        } else {
+            if self.intervals[index].is_empty() {
+                self.intervals.remove(index);
             }
         }
 
+        if removed {
+            return Ok(());
+        }
         return Err(QueueWithIntervalsError::MessagesNotFound);
     }
 
-    fn merge_items_if_possible(&mut self, index: usize) {
-        if index == 0 {
-            let (current, next) = self.inner.get_two(index);
-            let mut merged = None;
-            if let Some(current) = current {
-                if let Some(next) = next {
-                    merged = current.try_to_merge_with_next_item(next);
-                }
-            }
-
-            if let Some(merged) = merged {
-                self.inner.update(index, merged);
-                self.inner.remove(index + 1);
-            }
-
-            return;
-        }
-
-        let (prev, current) = self.inner.get_two(index - 1);
-        let mut merged = None;
-        if let Some(prev) = prev {
-            if let Some(current) = current {
-                merged = prev.try_to_merge_with_next_item(current);
-            }
-        }
-
-        if let Some(merged) = merged {
-            self.inner.update(index - 1, merged);
-            self.inner.remove(index);
-        }
-
-        let (current, next) = self.inner.get_two(index);
-        let mut merged = None;
-        if let Some(current) = current {
-            if let Some(next) = next {
-                merged = current.try_to_merge_with_next_item(next);
-            }
-        }
-
-        if let Some(merged) = merged {
-            self.inner.update(index, merged);
-            self.inner.remove(index + 1);
-        }
-    }
-
-    pub fn enqueue(&mut self, message_id: i64) {
-        let mut found_index = None;
-
-        for index in 0..self.inner.intervals_amount() {
-            let el = self.inner.get_mut(index).unwrap();
-
-            if el.try_join(message_id) {
-                found_index = Some(index);
-                break;
-            }
-
-            if message_id < el.from_id - 1 {
-                let item = QueueIndexRange::new_with_single_value(message_id);
-                self.inner.insert(index, item);
-                found_index = Some(index);
-                break;
-            }
-        }
-
-        match found_index {
-            Some(index_we_handled) => self.merge_items_if_possible(index_we_handled),
-            None => {
-                let item = QueueIndexRange::new_with_single_value(message_id);
-                self.inner.push(item);
-            }
-        }
-    }
-
-    fn get_indexes_it_covers(&self, range_to_insert: &QueueIndexRange) -> Vec<usize> {
-        let mut result = Vec::new();
-
-        for index in 0..self.inner.intervals_amount() {
-            let el = self.inner.get(index).unwrap();
-
-            if range_to_insert.from_id <= el.from_id && range_to_insert.to_id >= el.to_id {
-                result.push(index);
-            }
-        }
-
-        result
-    }
-
-    fn compact_it(&mut self) {
+    pub fn enqueue(&mut self, value: i64) {
         let mut index = 0;
-        while index < self.inner.intervals_amount() - 1 {
-            let el_to_id = self.inner.get(index).unwrap().to_id;
-            let next = self.inner.get(index + 1).unwrap().clone();
 
-            if next.can_be_joined_to_interval_from_the_left(el_to_id) {
-                let removed = self.inner.remove(index + 1);
-                if let Some(removed) = removed {
-                    self.inner.get_mut(index).unwrap().to_id = removed.to_id;
-                }
-
-                continue;
+        let mut prev_element: Option<QueueIndexRange> = None;
+        let mut insert_element: Option<QueueIndexRange> = None;
+        for item in &mut self.intervals {
+            if item.is_empty() {
+                item.from_id = value;
+                item.to_id = value;
+                return;
             }
+
+            if item.is_in_my_interval_to_enqueue(value) {
+                if value == item.to_id + 1 {
+                    item.to_id = value;
+                } else if value == item.from_id - 1 {
+                    item.from_id = value;
+                }
+                break;
+            }
+
+            match &prev_element {
+                Some(prev_element) => {
+                    if prev_element.to_id < value && value < item.from_id {
+                        insert_element = Some(QueueIndexRange {
+                            from_id: value,
+                            to_id: value,
+                        });
+                        break;
+                    }
+                }
+                None => {
+                    if value < item.from_id {
+                        insert_element = Some(QueueIndexRange {
+                            from_id: value,
+                            to_id: value,
+                        });
+                        break;
+                    }
+                }
+            }
+
+            prev_element = Some(item.clone());
 
             index += 1;
         }
+
+        if let Some(insert_element) = insert_element {
+            self.intervals.insert(index, insert_element);
+            return;
+        }
+
+        // Add Last Element
+        if index == self.intervals.len() {
+            if let Some(prev_element) = prev_element {
+                if value > prev_element.to_id {
+                    self.intervals.push(QueueIndexRange {
+                        from_id: value,
+                        to_id: value,
+                    });
+                }
+            }
+        }
+
+        self.merge_if_needed(index);
     }
 
+    /*
+       fn compact_it(&mut self) {
+           let mut index = 0;
+           while index < self.inner.intervals_amount() - 1 {
+               let el_to_id = self.inner.get(index).unwrap().to_id;
+               let next = self.inner.get(index + 1).unwrap().clone();
+
+               if next.can_be_joined_to_interval_from_the_left(el_to_id) {
+                   let removed = self.inner.remove(index + 1);
+                   if let Some(removed) = removed {
+                       self.inner.get_mut(index).unwrap().to_id = removed.to_id;
+                   }
+
+                   continue;
+               }
+
+               index += 1;
+           }
+       }
+    */
+    /*
     pub fn merge_with(&mut self, other_queue: &QueueWithIntervals) {
         for range in other_queue.inner.iter() {
             self.enqueue_range(range);
         }
-    }
+    } */
 
     pub fn enqueue_range(&mut self, range_to_insert: QueueIndexRange) {
-        let first_el_result: Option<&mut QueueIndexRange> = self.inner.get_mut(0);
-
-        if first_el_result.is_none() {
-            self.inner.push(range_to_insert.clone());
+        if self.is_empty() {
+            let first = self.intervals.get_mut(0).unwrap();
+            first.from_id = range_to_insert.from_id;
+            first.to_id = range_to_insert.to_id;
             return;
         }
 
-        /*
+        let (from_index, to_index) = IndexToInsertRange::new(&self.intervals, &range_to_insert);
 
-        match first_el_result {
-            Some(first_el) => {
-                if first_el.is_empty() {
-                    first_el.from_id = range_to_insert.from_id;
-                    first_el.to_id = range_to_insert.to_id;
+        match from_index {
+            IndexToInsertRange::First => match to_index {
+                IndexToInsertRange::Exact(to_index) => {
+                    self.insert_with_override_to_right(0, to_index, range_to_insert);
+                }
+                IndexToInsertRange::First => {
+                    let first_element = self.intervals.first_mut().unwrap();
+
+                    if range_to_insert.to_id + 1 == first_element.from_id {
+                        first_element.from_id = range_to_insert.from_id;
+                        return;
+                    }
+
+                    self.intervals.insert(0, range_to_insert);
+                }
+                IndexToInsertRange::Last => {
+                    self.intervals = vec![range_to_insert];
+                }
+                IndexToInsertRange::Between {
+                    left_index,
+                    right_index: _,
+                } => {
+                    self.insert_with_full_cover(0, left_index, range_to_insert);
+                }
+            },
+            IndexToInsertRange::Exact(from_index) => match to_index {
+                IndexToInsertRange::Exact(to_index) => {
+                    self.insert_with_override_left_and_right(from_index, to_index);
+                }
+                IndexToInsertRange::First => {
+                    panic!("Position between some interval and first element is not possible");
+                }
+                IndexToInsertRange::Last => {
+                    self.insert_with_override_to_left(
+                        from_index,
+                        self.intervals.len() - 1,
+                        range_to_insert,
+                    );
+                }
+                IndexToInsertRange::Between {
+                    left_index,
+                    right_index: _,
+                } => {
+                    self.insert_with_override_to_left(from_index, left_index, range_to_insert);
+                }
+            },
+
+            IndexToInsertRange::Last => match to_index {
+                IndexToInsertRange::Exact(_) => {
+                    panic!("Index can not be between Last and other element");
+                }
+                IndexToInsertRange::First => {
+                    panic!("Index can not be between Last and First elements");
+                }
+                IndexToInsertRange::Last => {
+                    let last = self.intervals.last_mut().unwrap();
+
+                    if last.to_id + 1 == range_to_insert.from_id {
+                        last.to_id = range_to_insert.to_id;
+                        return;
+                    }
+
+                    self.intervals.push(range_to_insert);
                     return;
                 }
-            }
-
-            None => {
-                self.inner.push(range_to_insert.clone());
-                return;
-            }
-        }
-        */
-
-        let mut cover_indexes = self.get_indexes_it_covers(&range_to_insert);
-
-        if cover_indexes.len() > 0 {
-            let first_index = cover_indexes[0];
-            let mut from_id = self.inner.get(first_index).unwrap().from_id;
-
-            if range_to_insert.from_id < from_id {
-                from_id = range_to_insert.from_id;
-            }
-
-            let last = cover_indexes.last().unwrap();
-
-            let mut to_id = self.inner.get(*last).unwrap().to_id;
-
-            if range_to_insert.to_id > to_id {
-                to_id = range_to_insert.to_id;
-            }
-
-            while cover_indexes.len() > 1 {
-                self.inner.remove(cover_indexes.len() - 1);
-                cover_indexes.remove(0);
-            }
-
-            let el = self.inner.get_mut(first_index).unwrap();
-            el.from_id = from_id;
-            el.to_id = to_id;
-
-            self.compact_it();
-        }
-
-        let mut from_index = None;
-
-        for index in 0..self.inner.intervals_amount() {
-            let current_range = self.inner.get(index).unwrap().clone();
-
-            if current_range.from_id <= range_to_insert.from_id
-                && current_range.to_id >= range_to_insert.to_id
-            {
-                return;
-            }
-
-            if current_range.can_be_joined_to_interval_from_the_left(range_to_insert.to_id) {
-                self.inner.get_mut(index).unwrap().from_id = range_to_insert.from_id;
-                return;
-            }
-
-            if range_to_insert.to_id < current_range.from_id - 1 {
-                self.inner.insert(index, range_to_insert.clone());
-                return;
-            }
-
-            if current_range.can_be_joined_to_interval_from_the_right(range_to_insert.from_id) {
-                if index == self.inner.intervals_amount() - 1 {
-                    self.inner.get_mut(index).unwrap().to_id = range_to_insert.to_id;
-                    return;
+                IndexToInsertRange::Between {
+                    left_index: _,
+                    right_index: _,
+                } => {
+                    panic!("Index can not be between Last and Between elements");
                 }
-
-                let next_range = self.inner.get_mut(index + 1).unwrap();
-
-                if range_to_insert.to_id < next_range.from_id - 1 {
-                    self.inner.get_mut(index).unwrap().to_id = range_to_insert.to_id;
-                    return;
+            },
+            IndexToInsertRange::Between {
+                left_index: _,
+                right_index,
+            } => match to_index {
+                IndexToInsertRange::Exact(to_index) => {
+                    self.insert_with_override_to_right(right_index, to_index, range_to_insert);
                 }
+                IndexToInsertRange::First => {
+                    panic!("Can not be between elements and first element")
+                }
+                IndexToInsertRange::Last => {
+                    self.insert_with_full_cover(
+                        right_index,
+                        self.intervals.len() - 1,
+                        range_to_insert,
+                    );
+                }
+                IndexToInsertRange::Between {
+                    left_index: to_left_index,
+                    right_index: _,
+                } => {
+                    self.insert_with_full_cover(right_index, to_left_index, range_to_insert);
+                }
+            },
+        }
+    }
 
-                from_index = Some(index);
-                break;
-            }
+    fn insert_with_override_to_right(
+        &mut self,
+        from_index: usize,
+        to_index: usize,
+        range_to_insert: QueueIndexRange,
+    ) {
+        let to_id = self.intervals.get(to_index).unwrap().to_id;
+
+        for _ in from_index..to_index {
+            self.intervals.remove(from_index + 1);
         }
 
-        if from_index.is_none() {
-            self.inner.push(range_to_insert.clone());
-            return;
+        let first = self.intervals.get_mut(from_index).unwrap();
+        first.from_id = range_to_insert.from_id;
+        first.to_id = to_id;
+    }
+
+    fn insert_with_override_to_left(
+        &mut self,
+        from_index: usize,
+        to_index: usize,
+        range_to_insert: QueueIndexRange,
+    ) {
+        for _ in from_index..to_index {
+            self.intervals.remove(from_index + 1);
         }
 
-        let from_index = from_index.unwrap();
-        while from_index < self.inner.intervals_amount() - 1 {
-            let next_range = self.inner.remove(from_index + 1).unwrap();
+        let first = self.intervals.get_mut(from_index).unwrap();
+        first.to_id = range_to_insert.to_id;
+    }
 
-            if next_range.can_be_joined_to_interval_from_the_left(range_to_insert.to_id) {
-                self.inner.get_mut(from_index).unwrap().to_id = next_range.to_id;
-                return;
-            }
+    fn insert_with_full_cover(
+        &mut self,
+        from_index: usize,
+        to_index: usize,
+        range_to_insert: QueueIndexRange,
+    ) {
+        for _ in from_index..to_index {
+            self.intervals.remove(from_index + 1);
         }
 
-        self.inner.push(range_to_insert.clone());
+        let first = self.intervals.get_mut(from_index).unwrap();
+        first.from_id = range_to_insert.from_id;
+        first.to_id = range_to_insert.to_id;
+    }
+
+    fn insert_with_override_left_and_right(&mut self, from_index: usize, to_index: usize) {
+        let to_id = self.intervals.get(to_index).unwrap().to_id;
+
+        for _ in from_index..to_index {
+            self.intervals.remove(from_index + 1);
+        }
+
+        let first = self.intervals.get_mut(from_index).unwrap();
+        first.to_id = to_id;
     }
 
     pub fn dequeue(&mut self) -> Option<i64> {
-        let first_interval = self.inner.get_mut(0)?;
+        let (result, is_empty) = {
+            let itm = self.intervals.get_mut(0).unwrap();
+            if itm.is_empty() {
+                return None;
+            }
 
-        let result = first_interval.dequeue();
+            let result = itm.from_id;
+            itm.from_id += 1;
 
-        if first_interval.is_empty() && self.inner.intervals_amount() > 1 {
-            self.inner.remove(0);
+            (result, itm.is_empty())
+        };
+
+        if is_empty {
+            if self.intervals.len() > 1 {
+                self.intervals.remove(0);
+            }
         }
 
-        result
+        Some(result)
     }
 
     pub fn peek(&self) -> Option<i64> {
-        let first_interval = self.inner.get(0)?;
+        let result = self.intervals.get(0).unwrap();
 
-        first_interval.peek()
+        if result.is_empty() {
+            return None;
+        }
+
+        Some(result.from_id)
     }
 
     pub fn get_snapshot(&self) -> Vec<QueueIndexRange> {
-        self.inner.get_snapshot()
-    }
+        if self.is_empty() {
+            return vec![];
+        }
 
-    pub fn push_interval(&mut self, index_range: QueueIndexRange) {
-        self.inner.push(index_range);
+        self.intervals.clone()
     }
 
     // Returns non - only if we did not put any messages into the queue never
+
     pub fn get_min_id(&self) -> Option<i64> {
-        self.inner.get_min_id()
+        let first = self.intervals.get(0).unwrap();
+
+        if first.is_empty() {
+            return None;
+        }
+
+        Some(first.from_id)
     }
 
     pub fn get_max_id(&self) -> Option<i64> {
-        self.inner.get_max_id()
+        let last = self.intervals.get(self.intervals.len() - 1).unwrap();
+        if last.is_empty() {
+            return None;
+        }
+
+        Some(last.to_id)
     }
 
     pub fn has_message(&self, id: i64) -> bool {
-        self.inner.has_item(|item| {
-            if let Some(range) = item.compare_with(id) {
-                if let QueueIndexRangeCompare::Inside = range {
-                    return true;
-                }
+        for interval in &self.intervals {
+            if interval.is_in_my_interval(id) {
+                return true;
             }
-
-            false
-        })
+        }
+        false
     }
 
-    pub fn split(&self, id: i64) -> (Option<QueueWithIntervals>, Option<QueueWithIntervals>) {
-        let min_id = self.get_min_id();
+    fn merge_if_needed(&mut self, index: usize) {
+        let mut merge_with_next_id = None;
 
-        if min_id.is_none() {
-            return (None, None);
+        if let Some(next_element) = self.intervals.get(index + 1) {
+            if let Some(element) = self.intervals.get(index) {
+                if element.to_id + 1 == next_element.from_id {
+                    merge_with_next_id = Some(next_element.to_id)
+                }
+            }
         }
 
-        let min_id = min_id.unwrap();
-
-        if id < min_id {
-            return (Some(self.clone()), None);
+        if let Some(merge_with_next_id) = merge_with_next_id {
+            self.intervals.get_mut(index).unwrap().to_id = merge_with_next_id;
+            self.intervals.remove(index + 1);
+            return;
         }
 
-        let max_id = self.get_max_id();
+        if index > 0 {
+            let mut merge_with_prev_id = None;
 
-        if max_id.is_none() {
-            return (None, None);
-        }
-
-        let max_id = max_id.unwrap();
-
-        if id > max_id {
-            return (Some(self.clone()), None);
-        }
-
-        let mut doing_left = true;
-        let mut left: Vec<QueueIndexRange> = Vec::new();
-        let mut right: Vec<QueueIndexRange> = Vec::new();
-
-        for interval in self.inner.iter() {
-            if doing_left {
-                if interval.from_id <= id && id < interval.to_id {
-                    left.push(QueueIndexRange {
-                        from_id: interval.from_id,
-                        to_id: id,
-                    });
-
-                    doing_left = false;
-
-                    if id + 1 <= interval.to_id {
-                        right.push(QueueIndexRange {
-                            from_id: id + 1,
-                            to_id: interval.to_id,
-                        });
+            if let Some(prev_element) = self.intervals.get(index - 1) {
+                if let Some(element) = self.intervals.get(index) {
+                    if prev_element.to_id + 1 == element.from_id {
+                        merge_with_prev_id = Some(element.to_id)
                     }
-                } else if interval.from_id < id && id == interval.to_id {
-                    left.push(QueueIndexRange {
-                        from_id: interval.from_id,
-                        to_id: interval.to_id,
-                    });
-
-                    doing_left = false;
-                } else {
-                    left.push(interval.clone());
                 }
-            } else {
-                right.push(interval.clone())
+            }
+
+            if let Some(merge_with_prev_id) = merge_with_prev_id {
+                self.intervals.get_mut(index - 1).unwrap().to_id = merge_with_prev_id;
+                self.intervals.remove(index);
             }
         }
-
-        (
-            Some(QueueWithIntervals::restore(left)),
-            Some(QueueWithIntervals::restore(right)),
-        )
     }
 
+    /*
+       pub fn split(&self, id: i64) -> (Option<QueueWithIntervals>, Option<QueueWithIntervals>) {
+           let min_id = self.get_min_id();
+
+           if min_id.is_none() {
+               return (None, None);
+           }
+
+           let min_id = min_id.unwrap();
+
+           if id < min_id {
+               return (Some(self.clone()), None);
+           }
+
+           let max_id = self.get_max_id();
+
+           if max_id.is_none() {
+               return (None, None);
+           }
+
+           let max_id = max_id.unwrap();
+
+           if id > max_id {
+               return (Some(self.clone()), None);
+           }
+
+           let mut doing_left = true;
+           let mut left: Vec<QueueIndexRange> = Vec::new();
+           let mut right: Vec<QueueIndexRange> = Vec::new();
+
+           for interval in self.inner.iter() {
+               if doing_left {
+                   if interval.from_id <= id && id < interval.to_id {
+                       left.push(QueueIndexRange {
+                           from_id: interval.from_id,
+                           to_id: id,
+                       });
+
+                       doing_left = false;
+
+                       if id + 1 <= interval.to_id {
+                           right.push(QueueIndexRange {
+                               from_id: id + 1,
+                               to_id: interval.to_id,
+                           });
+                       }
+                   } else if interval.from_id < id && id == interval.to_id {
+                       left.push(QueueIndexRange {
+                           from_id: interval.from_id,
+                           to_id: interval.to_id,
+                       });
+
+                       doing_left = false;
+                   } else {
+                       left.push(interval.clone());
+                   }
+               } else {
+                   right.push(interval.clone())
+               }
+           }
+
+           (
+               Some(QueueWithIntervals::restore(left)),
+               Some(QueueWithIntervals::restore(right)),
+           )
+       }
+    */
     pub fn queue_size(&self) -> usize {
-        self.inner.queue_size()
-    }
-    #[cfg(test)]
-    pub fn get_intervals_amount(&self) -> usize {
-        self.inner.intervals_amount()
-    }
+        let mut result = 0;
 
-    pub fn get_interval(&self, index: usize) -> Option<&QueueIndexRange> {
-        self.inner.get(index)
-    }
+        for interval in &self.intervals {
+            result += interval.len()
+        }
 
-    pub fn iterate_intervals(&self) -> QueueWithIntervalsInnerIterator {
-        QueueWithIntervalsInnerIterator::new(&self.inner)
+        result as usize
     }
 }
 
@@ -481,14 +607,14 @@ mod tests {
         queue.enqueue(200);
         queue.enqueue(201);
 
-        assert_eq!(1, queue.get_intervals_amount());
+        assert_eq!(1, queue.intervals.len());
 
         queue.enqueue(203);
 
-        assert_eq!(2, queue.get_intervals_amount());
+        assert_eq!(2, queue.intervals.len());
 
         queue.enqueue(202);
-        assert_eq!(1, queue.get_intervals_amount());
+        assert_eq!(1, queue.intervals.len());
     }
 
     #[test]
@@ -503,10 +629,10 @@ mod tests {
 
         queue.remove(200).unwrap();
 
-        assert_eq!(1, queue.get_intervals_amount());
+        assert_eq!(1, queue.intervals.len());
 
-        assert_eq!(201, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(204, queue.get_interval(0).unwrap().to_id);
+        assert_eq!(201, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(204, queue.intervals.get(0).unwrap().to_id);
     }
 
     #[test]
@@ -521,12 +647,10 @@ mod tests {
 
         queue.remove(204).unwrap();
 
-        println!("Len: {}", queue.get_intervals_amount());
+        assert_eq!(1, queue.intervals.len());
 
-        assert_eq!(1, queue.get_intervals_amount());
-
-        assert_eq!(200, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(203, queue.get_interval(0).unwrap().to_id);
+        assert_eq!(200, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(203, queue.intervals.get(0).unwrap().to_id);
     }
 
     #[test]
@@ -541,15 +665,13 @@ mod tests {
 
         queue.remove(202).unwrap();
 
-        println!("Len: {}", queue.get_intervals_amount());
+        assert_eq!(2, queue.intervals.len());
 
-        assert_eq!(2, queue.get_intervals_amount());
+        assert_eq!(200, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(201, queue.intervals.get(0).unwrap().to_id);
 
-        assert_eq!(200, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(201, queue.get_interval(0).unwrap().to_id);
-
-        assert_eq!(203, queue.get_interval(1).unwrap().from_id);
-        assert_eq!(204, queue.get_interval(1).unwrap().to_id);
+        assert_eq!(203, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(204, queue.intervals.get(1).unwrap().to_id);
     }
 
     #[test]
@@ -565,29 +687,29 @@ mod tests {
         queue.enqueue(206);
 
         queue.remove(202).unwrap();
-        assert_eq!(2, queue.get_intervals_amount());
+        assert_eq!(2, queue.intervals.len());
 
         queue.remove(205).unwrap();
-        assert_eq!(3, queue.get_intervals_amount());
+        assert_eq!(3, queue.intervals.len());
 
-        assert_eq!(200, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(201, queue.get_interval(0).unwrap().to_id);
+        assert_eq!(200, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(201, queue.intervals.get(0).unwrap().to_id);
 
-        assert_eq!(203, queue.get_interval(1).unwrap().from_id);
-        assert_eq!(204, queue.get_interval(1).unwrap().to_id);
+        assert_eq!(203, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(204, queue.intervals.get(1).unwrap().to_id);
 
-        assert_eq!(206, queue.get_interval(2).unwrap().from_id);
-        assert_eq!(206, queue.get_interval(2).unwrap().to_id);
+        assert_eq!(206, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(206, queue.intervals.get(2).unwrap().to_id);
 
         queue.remove(203).unwrap();
         queue.remove(204).unwrap();
-        assert_eq!(2, queue.get_intervals_amount());
+        assert_eq!(2, queue.intervals.len());
 
-        assert_eq!(200, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(201, queue.get_interval(0).unwrap().to_id);
+        assert_eq!(200, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(201, queue.intervals.get(0).unwrap().to_id);
 
-        assert_eq!(206, queue.get_interval(1).unwrap().from_id);
-        assert_eq!(206, queue.get_interval(1).unwrap().to_id);
+        assert_eq!(206, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(206, queue.intervals.get(1).unwrap().to_id);
     }
 
     #[test]
@@ -603,28 +725,28 @@ mod tests {
         queue.enqueue(206);
 
         queue.remove(202).unwrap();
-        assert_eq!(2, queue.get_intervals_amount());
+        assert_eq!(2, queue.intervals.len());
 
         queue.remove(205).unwrap();
-        assert_eq!(3, queue.get_intervals_amount());
+        assert_eq!(3, queue.intervals.len());
 
-        assert_eq!(200, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(201, queue.get_interval(0).unwrap().to_id);
+        assert_eq!(200, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(201, queue.intervals.get(0).unwrap().to_id);
 
-        assert_eq!(203, queue.get_interval(1).unwrap().from_id);
-        assert_eq!(204, queue.get_interval(1).unwrap().to_id);
+        assert_eq!(203, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(204, queue.intervals.get(1).unwrap().to_id);
 
-        assert_eq!(206, queue.get_interval(2).unwrap().from_id);
-        assert_eq!(206, queue.get_interval(2).unwrap().to_id);
+        assert_eq!(206, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(206, queue.intervals.get(2).unwrap().to_id);
 
         queue.remove(206).unwrap();
-        assert_eq!(2, queue.get_intervals_amount());
+        assert_eq!(2, queue.intervals.len());
 
-        assert_eq!(200, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(201, queue.get_interval(0).unwrap().to_id);
+        assert_eq!(200, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(201, queue.intervals.get(0).unwrap().to_id);
 
-        assert_eq!(203, queue.get_interval(1).unwrap().from_id);
-        assert_eq!(204, queue.get_interval(1).unwrap().to_id);
+        assert_eq!(203, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(204, queue.intervals.get(1).unwrap().to_id);
     }
 
     #[test]
@@ -654,12 +776,60 @@ mod tests {
         queue.enqueue(504);
 
         queue.enqueue(508);
-        assert_eq!(queue.get_intervals_amount(), 2);
+        assert_eq!(queue.intervals.len(), 2);
+
+        assert_eq!(502, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(504, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(508, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(508, queue.intervals.get(1).unwrap().to_id);
 
         queue.enqueue(506);
-        assert_eq!(queue.get_intervals_amount(), 3);
+        assert_eq!(queue.intervals.len(), 3);
+
+        assert_eq!(502, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(504, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(506, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(506, queue.intervals.get(1).unwrap().to_id);
+
+        assert_eq!(508, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(508, queue.intervals.get(2).unwrap().to_id);
+
         queue.enqueue(507);
-        assert_eq!(queue.get_intervals_amount(), 2);
+        assert_eq!(queue.intervals.len(), 2);
+
+        assert_eq!(502, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(504, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(506, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(508, queue.intervals.get(1).unwrap().to_id);
+    }
+
+    #[test]
+    fn enqueue_exact_interval() {
+        let mut queue = QueueWithIntervals::new();
+
+        queue.enqueue(502);
+        queue.enqueue(503);
+        queue.enqueue(504);
+
+        queue.enqueue(506);
+        queue.enqueue(507);
+        assert_eq!(queue.intervals.len(), 2);
+
+        assert_eq!(502, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(504, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(506, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(507, queue.intervals.get(1).unwrap().to_id);
+
+        queue.enqueue(505);
+
+        assert_eq!(queue.intervals.len(), 1);
+
+        assert_eq!(502, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(507, queue.intervals.get(0).unwrap().to_id);
     }
 
     #[test]
@@ -668,10 +838,10 @@ mod tests {
 
         queue.enqueue_range(QueueIndexRange::restore(10, 15));
 
-        assert_eq!(1, queue.get_intervals_amount());
+        assert_eq!(1, queue.intervals.len());
 
-        assert_eq!(10, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(15, queue.get_interval(0).unwrap().to_id);
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(15, queue.intervals.get(0).unwrap().to_id);
     }
 
     #[test]
@@ -680,16 +850,35 @@ mod tests {
         let mut queue = QueueWithIntervals::new();
         queue.enqueue_range(QueueIndexRange::restore(10, 15));
 
+        let new_interval = QueueIndexRange::restore(20, 25);
+
         // Doing action
-        queue.enqueue_range(QueueIndexRange::restore(20, 25));
+        queue.enqueue_range(new_interval);
 
-        assert_eq!(2, queue.get_intervals_amount());
+        assert_eq!(2, queue.intervals.len());
 
-        assert_eq!(10, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(15, queue.get_interval(0).unwrap().to_id);
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(15, queue.intervals.get(0).unwrap().to_id);
 
-        assert_eq!(20, queue.get_interval(1).unwrap().from_id);
-        assert_eq!(25, queue.get_interval(1).unwrap().to_id);
+        assert_eq!(20, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(25, queue.intervals.get(1).unwrap().to_id);
+    }
+
+    #[test]
+    fn enqueue_range_case_to_the_end_of_the_list_with_merge() {
+        //Preparing data
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue_range(QueueIndexRange::restore(10, 15));
+
+        let new_interval = QueueIndexRange::restore(16, 25);
+
+        // Doing action
+        queue.enqueue_range(new_interval);
+
+        assert_eq!(1, queue.intervals.len());
+
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(25, queue.intervals.get(0).unwrap().to_id);
     }
 
     #[test]
@@ -698,215 +887,498 @@ mod tests {
         let mut queue = QueueWithIntervals::new();
         queue.enqueue_range(QueueIndexRange::restore(15, 20));
 
+        let range_to_insert = QueueIndexRange::restore(5, 10);
+
         // Doing action
-        queue.enqueue_range(QueueIndexRange::restore(5, 10));
+        queue.enqueue_range(range_to_insert);
 
-        assert_eq!(2, queue.get_intervals_amount());
+        assert_eq!(2, queue.intervals.len());
 
-        assert_eq!(5, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(10, queue.get_interval(0).unwrap().to_id);
+        assert_eq!(5, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(10, queue.intervals.get(0).unwrap().to_id);
 
-        assert_eq!(15, queue.get_interval(1).unwrap().from_id);
-        assert_eq!(20, queue.get_interval(1).unwrap().to_id);
+        assert_eq!(15, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(1).unwrap().to_id);
     }
 
     #[test]
-    fn enqueue_range_at_the_beginning_joining_the_first_one() {
+    fn enqueue_range_at_the_beginning_with_merge() {
         //Preparing data
         let mut queue = QueueWithIntervals::new();
         queue.enqueue_range(QueueIndexRange::restore(15, 20));
 
+        let range_to_insert = QueueIndexRange::restore(5, 14);
+
         // Doing action
-        queue.enqueue_range(QueueIndexRange::restore(5, 14));
+        queue.enqueue_range(range_to_insert);
 
-        assert_eq!(1, queue.get_intervals_amount());
+        assert_eq!(1, queue.intervals.len());
 
-        assert_eq!(5, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(20, queue.get_interval(0).unwrap().to_id);
+        assert_eq!(5, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(0).unwrap().to_id);
     }
 
     #[test]
-    fn enqueue_range_at_the_beginning_joining_the_first_one_case_2() {
+    fn enqueue_range_at_the_beginning_joining_the_first_interval() {
         //Preparing data
         let mut queue = QueueWithIntervals::new();
         queue.enqueue_range(QueueIndexRange::restore(20, 25));
         queue.enqueue_range(QueueIndexRange::restore(10, 15));
 
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(15, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(20, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(25, queue.intervals.get(1).unwrap().to_id);
+
         // Doing action
-        queue.enqueue_range(QueueIndexRange::restore(5, 12));
+        let range_to_insert = QueueIndexRange::restore(5, 12);
 
-        assert_eq!(2, queue.get_intervals_amount());
+        queue.enqueue_range(range_to_insert);
 
-        assert_eq!(5, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(15, queue.get_interval(0).unwrap().to_id);
+        assert_eq!(2, queue.intervals.len());
 
-        assert_eq!(20, queue.get_interval(1).unwrap().from_id);
-        assert_eq!(25, queue.get_interval(1).unwrap().to_id);
-    }
-    #[test]
-    fn enqueue_range_in_the_middle() {
-        //Preparing data
-        let mut queue = QueueWithIntervals::new();
-        queue.enqueue_range(QueueIndexRange::restore(200, 205));
-        queue.enqueue_range(QueueIndexRange::restore(100, 105));
-        queue.enqueue_range(QueueIndexRange::restore(300, 305));
-        queue.enqueue_range(QueueIndexRange::restore(250, 255));
+        assert_eq!(5, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(15, queue.intervals.get(0).unwrap().to_id);
 
-        assert_eq!(4, queue.get_intervals_amount());
-
-        assert_eq!(100, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(105, queue.get_interval(0).unwrap().to_id);
-
-        assert_eq!(200, queue.get_interval(1).unwrap().from_id);
-        assert_eq!(205, queue.get_interval(1).unwrap().to_id);
-
-        assert_eq!(250, queue.get_interval(2).unwrap().from_id);
-        assert_eq!(255, queue.get_interval(2).unwrap().to_id);
-
-        assert_eq!(300, queue.get_interval(3).unwrap().from_id);
-        assert_eq!(305, queue.get_interval(3).unwrap().to_id);
+        assert_eq!(20, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(25, queue.intervals.get(1).unwrap().to_id);
     }
 
     #[test]
-    fn enqueue_range_in_the_middle_stick_to_the_left() {
+    fn enqueue_range_at_the_beginning_joining_the_first_and_second_intervals() {
         //Preparing data
         let mut queue = QueueWithIntervals::new();
-        queue.enqueue_range(QueueIndexRange::restore(10, 15));
-        queue.enqueue_range(QueueIndexRange::restore(100, 105));
-
-        // Doing action
-        queue.enqueue_range(QueueIndexRange::restore(16, 20));
-
-        assert_eq!(2, queue.get_intervals_amount());
-
-        assert_eq!(10, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(20, queue.get_interval(0).unwrap().to_id);
-
-        assert_eq!(100, queue.get_interval(1).unwrap().from_id);
-        assert_eq!(105, queue.get_interval(1).unwrap().to_id);
-    }
-
-    #[test]
-    fn enqueue_range_in_the_middle_stick_to_the_left_including() {
-        //Preparing data
-        let mut queue = QueueWithIntervals::new();
-        queue.enqueue_range(QueueIndexRange::restore(100, 105));
-        queue.enqueue_range(QueueIndexRange::restore(10, 15));
-
-        // Doing action
-        queue.enqueue_range(QueueIndexRange::restore(15, 20));
-
-        assert_eq!(2, queue.get_intervals_amount());
-
-        assert_eq!(10, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(20, queue.get_interval(0).unwrap().to_id);
-
-        assert_eq!(100, queue.get_interval(1).unwrap().from_id);
-        assert_eq!(105, queue.get_interval(1).unwrap().to_id);
-    }
-
-    #[test]
-    fn enqueue_range_in_the_middle_stick_to_the_right() {
-        //Preparing data
-        let mut queue = QueueWithIntervals::new();
-        queue.enqueue_range(QueueIndexRange::restore(100, 105));
-        queue.enqueue_range(QueueIndexRange::restore(10, 15));
-
-        // Doing action
-        queue.enqueue_range(QueueIndexRange::restore(90, 99));
-
-        assert_eq!(2, queue.get_intervals_amount());
-
-        assert_eq!(10, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(15, queue.get_interval(0).unwrap().to_id);
-
-        assert_eq!(90, queue.get_interval(1).unwrap().from_id);
-        assert_eq!(105, queue.get_interval(1).unwrap().to_id);
-    }
-
-    #[test]
-    fn enqueue_range_in_the_middle_stick_to_the_right_including() {
-        //Preparing data
-        let mut queue = QueueWithIntervals::new();
-        queue.enqueue_range(QueueIndexRange::restore(100, 105));
-        queue.enqueue_range(QueueIndexRange::restore(10, 15));
-
-        // Doing action
+        queue.enqueue_range(QueueIndexRange::restore(10, 20));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
         queue.enqueue_range(QueueIndexRange::restore(90, 100));
 
-        assert_eq!(2, queue.get_intervals_amount());
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(0).unwrap().to_id);
 
-        assert_eq!(10, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(15, queue.get_interval(0).unwrap().to_id);
+        assert_eq!(30, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(40, queue.intervals.get(1).unwrap().to_id);
 
-        assert_eq!(90, queue.get_interval(1).unwrap().from_id);
-        assert_eq!(105, queue.get_interval(1).unwrap().to_id);
-    }
+        assert_eq!(50, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(60, queue.intervals.get(2).unwrap().to_id);
 
-    #[test]
-    fn enqueue_range_in_the_middle_stick_to_the_left_and_right() {
-        //Preparing data
-        let mut queue = QueueWithIntervals::new();
-        queue.enqueue_range(QueueIndexRange::restore(100, 105));
-        queue.enqueue_range(QueueIndexRange::restore(10, 15));
+        assert_eq!(70, queue.intervals.get(3).unwrap().from_id);
+        assert_eq!(80, queue.intervals.get(3).unwrap().to_id);
+
+        assert_eq!(90, queue.intervals.get(4).unwrap().from_id);
+        assert_eq!(100, queue.intervals.get(4).unwrap().to_id);
 
         // Doing action
-        queue.enqueue_range(QueueIndexRange::restore(16, 99));
+        let range_to_insert = QueueIndexRange::restore(35, 75);
 
-        assert_eq!(1, queue.get_intervals_amount());
+        queue.enqueue_range(range_to_insert);
 
-        assert_eq!(10, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(105, queue.get_interval(0).unwrap().to_id);
+        assert_eq!(3, queue.intervals.len());
+
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(30, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(80, queue.intervals.get(1).unwrap().to_id);
+
+        assert_eq!(90, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(100, queue.intervals.get(2).unwrap().to_id);
     }
 
     #[test]
-    fn enqueue_range_in_the_middle_with_cover() {
-        //Preparing data
+    fn test_initializing_multiple_intervals() {
         let mut queue = QueueWithIntervals::new();
-        queue.enqueue_range(QueueIndexRange::restore(100, 105));
         queue.enqueue_range(QueueIndexRange::restore(10, 20));
-        queue.enqueue_range(QueueIndexRange::restore(30, 35));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
 
-        // Doing action
-        queue.enqueue_range(QueueIndexRange::restore(25, 40));
+        assert_eq!(4, queue.intervals.len());
 
-        assert_eq!(3, queue.get_intervals_amount());
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(0).unwrap().to_id);
 
-        assert_eq!(10, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(20, queue.get_interval(0).unwrap().to_id);
+        assert_eq!(30, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(40, queue.intervals.get(1).unwrap().to_id);
 
-        assert_eq!(25, queue.get_interval(1).unwrap().from_id);
-        assert_eq!(40, queue.get_interval(1).unwrap().to_id);
+        assert_eq!(50, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(60, queue.intervals.get(2).unwrap().to_id);
 
-        assert_eq!(100, queue.get_interval(2).unwrap().from_id);
-        assert_eq!(105, queue.get_interval(2).unwrap().to_id);
+        assert_eq!(70, queue.intervals.get(3).unwrap().from_id);
+        assert_eq!(80, queue.intervals.get(3).unwrap().to_id);
     }
 
     #[test]
-    fn enqueue_range_in_the_middle_with_cover_several_elements() {
-        //Preparing data
+    fn test_initializing_multiple_intervals_mixed_order() {
         let mut queue = QueueWithIntervals::new();
-        queue.enqueue_range(QueueIndexRange::restore(100, 105));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
         queue.enqueue_range(QueueIndexRange::restore(10, 20));
-        queue.enqueue_range(QueueIndexRange::restore(30, 35));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
 
-        queue.enqueue_range(QueueIndexRange::restore(40, 45));
+        assert_eq!(4, queue.intervals.len());
 
-        // Doing action
-        queue.enqueue_range(QueueIndexRange::restore(25, 70));
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(0).unwrap().to_id);
 
-        assert_eq!(3, queue.get_intervals_amount());
+        assert_eq!(30, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(40, queue.intervals.get(1).unwrap().to_id);
 
-        assert_eq!(10, queue.get_interval(0).unwrap().from_id);
-        assert_eq!(20, queue.get_interval(0).unwrap().to_id);
+        assert_eq!(50, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(60, queue.intervals.get(2).unwrap().to_id);
 
-        assert_eq!(25, queue.get_interval(1).unwrap().from_id);
-        assert_eq!(70, queue.get_interval(1).unwrap().to_id);
-
-        assert_eq!(100, queue.get_interval(2).unwrap().from_id);
-        assert_eq!(105, queue.get_interval(2).unwrap().to_id);
+        assert_eq!(70, queue.intervals.get(3).unwrap().from_id);
+        assert_eq!(80, queue.intervals.get(3).unwrap().to_id);
     }
 
+    #[test]
+    fn enqueue_range_covering_one_interval() {
+        //Preparing data
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue_range(QueueIndexRange::restore(10, 20));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
+
+        // Executing data
+        queue.enqueue_range(QueueIndexRange::restore(25, 45));
+
+        assert_eq!(4, queue.intervals.len());
+
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(25, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(45, queue.intervals.get(1).unwrap().to_id);
+
+        assert_eq!(50, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(60, queue.intervals.get(2).unwrap().to_id);
+
+        assert_eq!(70, queue.intervals.get(3).unwrap().from_id);
+        assert_eq!(80, queue.intervals.get(3).unwrap().to_id);
+    }
+
+    #[test]
+    fn enqueue_range_from_first_covering_first_interval() {
+        //Preparing data
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue_range(QueueIndexRange::restore(10, 20));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
+
+        let range_to_insert = QueueIndexRange::restore(5, 25);
+
+        // Executing data
+        queue.enqueue_range(range_to_insert);
+
+        assert_eq!(4, queue.intervals.len());
+
+        assert_eq!(5, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(25, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(30, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(40, queue.intervals.get(1).unwrap().to_id);
+
+        assert_eq!(50, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(60, queue.intervals.get(2).unwrap().to_id);
+
+        assert_eq!(70, queue.intervals.get(3).unwrap().from_id);
+        assert_eq!(80, queue.intervals.get(3).unwrap().to_id);
+    }
+
+    #[test]
+    fn enqueue_range_from_first_covering_first_two_intervals() {
+        //Preparing data
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue_range(QueueIndexRange::restore(10, 20));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
+
+        let range_to_insert = QueueIndexRange::restore(5, 45);
+
+        // Executing data
+        queue.enqueue_range(range_to_insert);
+
+        assert_eq!(3, queue.intervals.len());
+
+        assert_eq!(5, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(45, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(50, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(60, queue.intervals.get(1).unwrap().to_id);
+
+        assert_eq!(70, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(80, queue.intervals.get(2).unwrap().to_id);
+    }
+
+    #[test]
+    fn enqueue_range_from_covering_second_interval() {
+        //Preparing data
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue_range(QueueIndexRange::restore(10, 20));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
+
+        let range_to_insert = QueueIndexRange::restore(25, 45);
+
+        // Executing data
+        queue.enqueue_range(range_to_insert);
+
+        assert_eq!(4, queue.intervals.len());
+
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(25, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(45, queue.intervals.get(1).unwrap().to_id);
+
+        assert_eq!(50, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(60, queue.intervals.get(2).unwrap().to_id);
+
+        assert_eq!(70, queue.intervals.get(3).unwrap().from_id);
+        assert_eq!(80, queue.intervals.get(3).unwrap().to_id);
+    }
+
+    #[test]
+    fn enqueue_range_from_covering_second_and_third_intervals() {
+        //Preparing data
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue_range(QueueIndexRange::restore(10, 20));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
+
+        let range_to_insert = QueueIndexRange::restore(25, 65);
+
+        // Executing data
+        queue.enqueue_range(range_to_insert);
+
+        assert_eq!(3, queue.intervals.len());
+
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(25, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(65, queue.intervals.get(1).unwrap().to_id);
+
+        assert_eq!(70, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(80, queue.intervals.get(2).unwrap().to_id);
+    }
+
+    #[test]
+    fn enqueue_range_from_covering_last_interval() {
+        //Preparing data
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue_range(QueueIndexRange::restore(10, 20));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
+
+        let range_to_insert = QueueIndexRange::restore(65, 85);
+
+        // Executing data
+        queue.enqueue_range(range_to_insert);
+
+        assert_eq!(4, queue.intervals.len());
+
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(30, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(40, queue.intervals.get(1).unwrap().to_id);
+
+        assert_eq!(50, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(60, queue.intervals.get(2).unwrap().to_id);
+
+        assert_eq!(65, queue.intervals.get(3).unwrap().from_id);
+        assert_eq!(85, queue.intervals.get(3).unwrap().to_id);
+    }
+
+    #[test]
+    fn enqueue_range_from_covering_last_two_intervals() {
+        //Preparing data
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue_range(QueueIndexRange::restore(10, 20));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
+
+        let range_to_insert = QueueIndexRange::restore(45, 85);
+
+        // Executing data
+        queue.enqueue_range(range_to_insert);
+
+        assert_eq!(3, queue.intervals.len());
+
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(30, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(40, queue.intervals.get(1).unwrap().to_id);
+
+        assert_eq!(45, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(85, queue.intervals.get(2).unwrap().to_id);
+    }
+
+    #[test]
+    fn enqueue_range_from_covering_everything() {
+        //Preparing data
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue_range(QueueIndexRange::restore(10, 20));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
+
+        let range_to_insert = QueueIndexRange::restore(5, 85);
+
+        // Executing data
+        queue.enqueue_range(range_to_insert);
+
+        assert_eq!(1, queue.intervals.len());
+
+        assert_eq!(5, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(85, queue.intervals.get(0).unwrap().to_id);
+    }
+
+    #[test]
+    fn enqueue_range_covering_between_and_exact_single_interval() {
+        //Preparing data
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue_range(QueueIndexRange::restore(10, 20));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
+
+        let range_to_insert = QueueIndexRange::restore(25, 35);
+
+        // Executing data
+        queue.enqueue_range(range_to_insert);
+
+        assert_eq!(4, queue.intervals.len());
+
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(25, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(40, queue.intervals.get(1).unwrap().to_id);
+
+        assert_eq!(50, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(60, queue.intervals.get(2).unwrap().to_id);
+
+        assert_eq!(70, queue.intervals.get(3).unwrap().from_id);
+        assert_eq!(80, queue.intervals.get(3).unwrap().to_id);
+    }
+
+    #[test]
+    fn enqueue_range_covering_between_and_exact_two_intervals() {
+        //Preparing data
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue_range(QueueIndexRange::restore(10, 20));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
+
+        let range_to_insert = QueueIndexRange::restore(25, 55);
+
+        // Executing data
+        queue.enqueue_range(range_to_insert);
+
+        assert_eq!(3, queue.intervals.len());
+
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(25, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(60, queue.intervals.get(1).unwrap().to_id);
+
+        assert_eq!(70, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(80, queue.intervals.get(2).unwrap().to_id);
+    }
+
+    #[test]
+    fn enqueue_range_covering_exact_and_between_single_interval() {
+        //Preparing data
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue_range(QueueIndexRange::restore(10, 20));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
+
+        let range_to_insert = QueueIndexRange::restore(35, 45);
+
+        // Executing data
+        queue.enqueue_range(range_to_insert);
+
+        assert_eq!(4, queue.intervals.len());
+
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(30, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(45, queue.intervals.get(1).unwrap().to_id);
+
+        assert_eq!(50, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(60, queue.intervals.get(2).unwrap().to_id);
+
+        assert_eq!(70, queue.intervals.get(3).unwrap().from_id);
+        assert_eq!(80, queue.intervals.get(3).unwrap().to_id);
+    }
+
+    #[test]
+    fn enqueue_range_covering_exact_and_between_two_intervals() {
+        //Preparing data
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue_range(QueueIndexRange::restore(10, 20));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
+
+        let range_to_insert = QueueIndexRange::restore(35, 65);
+
+        // Executing data
+        queue.enqueue_range(range_to_insert);
+
+        assert_eq!(3, queue.intervals.len());
+
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(30, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(65, queue.intervals.get(1).unwrap().to_id);
+
+        assert_eq!(70, queue.intervals.get(2).unwrap().from_id);
+        assert_eq!(80, queue.intervals.get(2).unwrap().to_id);
+    }
+
+    #[test]
+    fn enqueue_range_covering_exact_and_to_last() {
+        //Preparing data
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue_range(QueueIndexRange::restore(10, 20));
+        queue.enqueue_range(QueueIndexRange::restore(30, 40));
+        queue.enqueue_range(QueueIndexRange::restore(50, 60));
+        queue.enqueue_range(QueueIndexRange::restore(70, 80));
+
+        let range_to_insert = QueueIndexRange::restore(35, 85);
+
+        // Executing data
+        queue.enqueue_range(range_to_insert);
+
+        assert_eq!(2, queue.intervals.len());
+
+        assert_eq!(10, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(20, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(30, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(85, queue.intervals.get(1).unwrap().to_id);
+    }
+
+    /*
     #[test]
     fn enqueue_range_in_the_middle_with_cover_several_elements_touching_right() {
         //Preparing data
@@ -1058,4 +1530,53 @@ mod tests {
         assert_eq!(104, right_q.get_max_id().unwrap());
         assert_eq!(1, right_q.get_intervals_amount());
     }
+
+    #[test]
+    fn test_compact() {
+        let queue = QueueWithIntervals::restore(vec![
+            QueueIndexRange {
+                from_id: 242375,
+                to_id: 253853,
+            },
+            QueueIndexRange {
+                from_id: 109315,
+                to_id: 109315,
+            },
+            QueueIndexRange {
+                from_id: 105846,
+                to_id: 105850,
+            },
+            QueueIndexRange {
+                from_id: 857,
+                to_id: 857,
+            },
+            QueueIndexRange {
+                from_id: 856,
+                to_id: 856,
+            },
+            QueueIndexRange {
+                from_id: 855,
+                to_id: 855,
+            },
+            QueueIndexRange {
+                from_id: 854,
+                to_id: 854,
+            },
+            QueueIndexRange {
+                from_id: 853,
+                to_id: 853,
+            },
+            QueueIndexRange {
+                from_id: 852,
+                to_id: 852,
+            },
+            QueueIndexRange {
+                from_id: 850,
+                to_id: 851,
+            },
+        ]);
+
+        println!("{:?}", queue.get_snapshot())
+    }
+     */
 }

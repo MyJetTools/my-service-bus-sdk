@@ -52,7 +52,7 @@ impl Iterator for SplittedByPageIdIterator {
             if to_page_id.get_value() > page_id.get_value() {
                 let to_id = page_id.get_last_message_id();
 
-                ids.push_interval(QueueIndexRange {
+                ids.enqueue_range(QueueIndexRange {
                     from_id: el.from_id,
                     to_id: to_id.get_value(),
                 });
@@ -62,7 +62,7 @@ impl Iterator for SplittedByPageIdIterator {
                 return Some(SplittedByPageId { page_id, ids });
             }
 
-            ids.push_interval(QueueIndexRange {
+            ids.enqueue_range(QueueIndexRange {
                 from_id: el.from_id,
                 to_id: el.to_id,
             });
@@ -115,12 +115,12 @@ mod tests {
     fn test_we_are_jumping_behind_the_page_2() {
         let mut src = QueueWithIntervals::from_single_interval(99_998, 100_002);
 
-        src.push_interval(QueueIndexRange {
+        src.enqueue_range(QueueIndexRange {
             from_id: 100_010,
             to_id: 100_020,
         });
 
-        src.push_interval(QueueIndexRange {
+        src.enqueue_range(QueueIndexRange {
             from_id: 199_990,
             to_id: 200_020,
         });

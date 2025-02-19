@@ -51,6 +51,9 @@ impl QueueIndexRange {
     pub fn is_in_my_interval(&self, id: i64)->bool{
         id >= self.from_id && id <= self.to_id
     }
+    pub fn is_in_my_interval_to_enqueue(&self, id: i64)->bool{
+        id >= self.from_id-1 && id <= self.to_id+1
+    }
 
 
 

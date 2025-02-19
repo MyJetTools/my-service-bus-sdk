@@ -1,17 +1,15 @@
-use super::QueueIndexRange;
+use super::{QueueIndexRange, QueueWithIntervalsIteratorInner};
 const MIN_CAPACITY: usize = 2;
 
 #[derive(Debug, Clone)]
 pub struct QueueWithIntervalsInner {
-    first: QueueIndexRange,
-    additional: Vec<QueueIndexRange>,
+    intervals: Vec<QueueIndexRange>,
 }
 
 impl QueueWithIntervalsInner {
     pub fn new(start_id: i64) -> Self {
         Self {
-            first: QueueIndexRange::new_empty(start_id),
-            additional: Vec::new(),
+            intervals: vec![QueueIndexRange::new_empty(start_id)],
         }
     }
 
@@ -20,95 +18,59 @@ impl QueueWithIntervalsInner {
             return Self::new(0);
         }
 
-        let first = intervals.remove(0);
+        intervals.sort_by_key(|itm| itm.from_id);
 
-        return Self {
-            first,
-            additional: intervals,
-        };
+        return Self { intervals };
     }
 
     pub fn from_single_interval(from_id: i64, to_id: i64) -> Self {
         Self {
-            first: QueueIndexRange { from_id, to_id },
-            additional: Vec::new(),
+            intervals: vec![QueueIndexRange { from_id, to_id }],
         }
     }
 
     pub fn get(&self, index: usize) -> Option<&QueueIndexRange> {
-        if index == 0 {
-            if self.first.is_empty() {
-                return None;
-            }
-
-            return Some(&self.first);
-        }
-        self.additional.get(index - 1)
+        self.intervals.get(index)
     }
 
-    pub fn push(&mut self, item: QueueIndexRange) {
-        if self.first.is_empty() {
-            self.first = item;
+    pub fn merge(&mut self, new_item: QueueIndexRange) {
+        if self.intervals.get(0).unwrap().is_empty() {
+            self.intervals[0] = new_item;
             return;
         }
 
-        self.additional.push(item);
+        let mut insert_index = 0;
+
+        for itm in &self.intervals {
+            if new_item.to_id < itm.from_id {
+                break;
+            }
+        }
     }
 
     pub fn get_two(
         &self,
         first_index: usize,
     ) -> (Option<&QueueIndexRange>, Option<&QueueIndexRange>) {
-        if first_index == 0 {
-            if self.first.is_empty() {
-                return (None, None);
-            }
-
-            return (Some(&self.first), self.additional.get(0));
-        }
         return (
-            self.additional.get(first_index - 1),
-            self.additional.get(first_index),
+            self.intervals.get(first_index),
+            self.intervals.get(first_index + 1),
         );
     }
 
     pub fn get_mut(&mut self, index: usize) -> Option<&mut QueueIndexRange> {
-        if index == 0 {
-            if self.first.is_empty() {
-                return None;
-            }
-
-            return Some(&mut self.first);
-        }
-        self.additional.get_mut(index - 1)
+        self.intervals.get_mut(index)
     }
 
     fn shrink_dynamic_content(&mut self) {
-        if self.additional.len() < MIN_CAPACITY {
-            self.additional.shrink_to(MIN_CAPACITY);
+        if self.intervals.len() < MIN_CAPACITY {
+            self.intervals.shrink_to(MIN_CAPACITY);
         }
     }
 
     pub fn remove(&mut self, index: usize) -> Option<QueueIndexRange> {
-        if index == 0 {
-            if self.first.is_empty() {
-                return None;
-            }
-            let result = self.first.clone();
-
-            if self.additional.len() == 0 {
-                self.first.reset();
-                return Some(result);
-            }
-            self.first = self.additional.remove(0);
-            self.shrink_dynamic_content();
-            return Some(result);
-        }
-
-        let index = index - 1;
-
-        if index < self.additional.len() {
-            let result = self.additional.remove(index);
+        if index < self.intervals.len() {
+            let result = self.intervals.remove(index);
             self.shrink_dynamic_content();
             return Some(result);
         }
@@ -117,50 +79,28 @@ impl QueueWithIntervalsInner {
     }
 
     pub fn reset(&mut self, mut intervals: Vec<QueueIndexRange>) {
-        self.additional.clear();
-        self.shrink_dynamic_content();
-
-        if intervals.len() == 0 {
-            self.first.reset();
-            return;
-        }
-
-        self.first = intervals.remove(0);
-        self.additional = intervals;
+        intervals.sort_by_key(|itm| itm.from_id);
+        self.intervals = intervals;
     }
 
     pub fn clean(&mut self) {
-        self.first.reset();
-        self.additional.clear();
+        self.intervals.truncate(1);
+        self.intervals.get_mut(0).unwrap().reset();
         self.shrink_dynamic_content();
     }
 
     pub fn insert(&mut self, index: usize, item: QueueIndexRange) {
-        if index == 0 {
-            if !self.first.is_empty() {
-                self.additional.insert(0, self.first.clone());
-            }
-            self.first = item;
-            return;
-        }
-
-        self.additional.insert(index - 1, item);
+        self.intervals.insert(index, item);
     }
 
     pub fn update(&mut self, index: usize, item: QueueIndexRange) {
-        if index == 0 {
-            self.first = item;
-            return;
-        }
-
-        let index = index - 1;
-        self.additional[index] = item;
+        self.intervals[index] = item;
     }
 
     pub fn queue_size(&self) -> usize {
-        let mut result = self.first.len();
+        let mut result = 0;
 
-        for interval in &self.additional {
+        for interval in &self.intervals {
             result += interval.len();
         }
 
@@ -168,94 +108,59 @@ impl QueueWithIntervalsInner {
     }
 
     pub fn intervals_amount(&self) -> usize {
-        if self.first.is_empty() {
-            return 0;
-        }
-
-        self.additional.len() + 1
+        self.intervals.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        if self.additional.len() > 0 {
-            return false;
+        if self.intervals.len() == 1 {
+            return self.intervals.get(0).unwrap().is_empty();
         }
 
-        self.first.is_empty()
+        false
     }
 
     pub fn find_my_interval_index(&self, id: i64) -> Option<usize> {
-        if self.first.is_in_my_interval(id) {
-            return Some(0);
-        }
+        self.intervals.iter().enumerate().find_map(|(index, item)| {
+            if item.is_in_my_interval(id) {
+                return Some(index);
+            }
 
-        self.additional
-            .iter()
-            .enumerate()
-            .find_map(|(index, item)| {
-                if item.is_in_my_interval(id) {
-                    return Some(index + 1);
-                }
-
-                None
-            })
+            None
+        })
     }
 
     pub fn get_range_mut(&mut self, index: usize) -> Option<&mut QueueIndexRange> {
-        if index == 0 {
-            if self.first.is_empty() {
-                return None;
-            }
-
-            return Some(&mut self.first);
-        }
-
-        self.additional.get_mut(index - 1)
+        self.intervals.get_mut(index)
     }
 
     pub fn get_snapshot(&self) -> Vec<QueueIndexRange> {
-        if self.first.is_empty() {
+        if self.get(0).unwrap().is_empty() {
             return vec![];
         }
 
-        let mut result = Vec::with_capacity(self.additional.len() + 1);
-        result.push(self.first.clone());
-        result.extend_from_slice(self.additional.as_slice());
-
-        result
+        self.intervals.clone()
     }
 
     pub fn get_min_id(&self) -> Option<i64> {
-        if self.first.is_empty() {
+        let first = self.get(0).unwrap();
+        if first.is_empty() {
             return None;
         }
 
-        Some(self.first.from_id)
+        Some(first.from_id)
     }
 
     pub fn get_max_id(&self) -> Option<i64> {
-        if self.first.is_empty() {
+        let last = self.get(self.intervals.len() - 1).unwrap();
+        if last.is_empty() {
             return None;
         }
 
-        if self.additional.len() == 0 {
-            return Some(self.first.to_id);
-        }
-
-        let result = self.additional.get(self.additional.len() - 1)?;
-
-        Some(result.to_id)
+        Some(last.to_id)
     }
 
     pub fn find(&self, callback: impl Fn(&QueueIndexRange) -> bool) -> Option<&QueueIndexRange> {
-        if self.first.is_empty() {
-            return None;
-        }
-
-        if callback(&self.first) {
-            return Some(&self.first);
-        }
-
-        for item in &self.additional {
+        for item in &self.intervals {
             if callback(item) {
                 return Some(item);
             }
@@ -265,15 +170,7 @@ impl QueueWithIntervalsInner {
     }
 
     pub fn has_item(&self, callback: impl Fn(&QueueIndexRange) -> bool) -> bool {
-        if self.first.is_empty() {
-            return false;
-        }
-
-        if callback(&self.first) {
-            return true;
-        }
-
-        for item in &self.additional {
+        for item in &self.intervals {
             if callback(item) {
                 return true;
             }
@@ -282,38 +179,8 @@ impl QueueWithIntervalsInner {
         false
     }
 
-    pub fn iter(&self) -> QueueWithIntervalsInnerIterator {
-        QueueWithIntervalsInnerIterator::new(self)
-    }
-}
-
-pub struct QueueWithIntervalsInnerIterator {
-    first: Option<QueueIndexRange>,
-    additional: Vec<QueueIndexRange>,
-}
-
-impl QueueWithIntervalsInnerIterator {
-    pub fn new(inner: &QueueWithIntervalsInner) -> Self {
-        Self {
-            first: Some(inner.first.clone()),
-            additional: inner.additional.clone(),
-        }
-    }
-}
-
-impl Iterator for QueueWithIntervalsInnerIterator {
-    type Item = QueueIndexRange;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(first) = self.first.take() {
-            return Some(first);
-        }
-
-        if self.additional.len() == 0 {
-            return None;
-        }
-
-        Some(self.additional.remove(0))
+    pub fn iter(&self) -> QueueWithIntervalsIteratorInner {
+        QueueWithIntervalsIteratorInner::new(self)
     }
 }
 
@@ -327,21 +194,21 @@ mod tests {
     fn test_len() {
         let mut inner = QueueWithIntervalsInner::new(0);
 
-        assert_eq!(inner.intervals_amount(), 0);
+        assert_eq!(inner.intervals_amount(), 1);
 
         inner.push(QueueIndexRange {
             from_id: 0,
             to_id: 10,
         });
 
-        assert_eq!(inner.intervals_amount(), 1);
+        assert_eq!(inner.intervals_amount(), 2);
 
         inner.push(QueueIndexRange {
             from_id: 15,
             to_id: 20,
         });
 
-        assert_eq!(inner.intervals_amount(), 2);
+        assert_eq!(inner.intervals_amount(), 3);
     }
 
     #[test]
