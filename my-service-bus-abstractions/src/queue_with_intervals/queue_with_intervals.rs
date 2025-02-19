@@ -26,6 +26,10 @@ impl QueueWithIntervals {
         self.intervals.get(index)
     }
 
+    pub fn get_intervals(&self) -> &[QueueIndexRange] {
+        self.intervals.as_slice()
+    }
+
     pub fn restore(mut intervals: Vec<QueueIndexRange>) -> Self {
         intervals.sort_by_key(|itm| itm.from_id);
         Self { intervals }
