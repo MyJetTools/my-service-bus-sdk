@@ -1,3 +1,5 @@
+use rust_extensions::StrOrString;
+
 use crate::queue_with_intervals::queue_index_range::QueueIndexRange;
 
 use super::{iterator::QueueWithIntervalsIterator, *};
@@ -447,6 +449,15 @@ impl QueueWithIntervals {
 
     pub fn iter(&self) -> QueueWithIntervalsIterator {
         QueueWithIntervalsIterator::new(self.clone())
+    }
+    pub fn len(&self) -> i64 {
+        let mut result = 0;
+
+        for interval in &self.intervals {
+            result += interval.len();
+        }
+
+        result
     }
 }
 
