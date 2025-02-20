@@ -156,6 +156,10 @@ impl QueueWithIntervals {
     }
 
     pub fn enqueue_range(&mut self, range_to_insert: QueueIndexRange) {
+        if range_to_insert.is_empty() {
+            return;
+        }
+
         if self.is_empty() {
             let first = self.intervals.get_mut(0).unwrap();
             first.from_id = range_to_insert.from_id;
@@ -391,110 +395,6 @@ impl QueueWithIntervals {
         false
     }
 
-    /*
-    fn merge_if_needed(&mut self, index: usize) {
-        let mut merge_with_next_id = None;
-
-        if let Some(next_element) = self.intervals.get(index + 1) {
-            if let Some(element) = self.intervals.get(index) {
-                if element.to_id + 1 == next_element.from_id {
-                    merge_with_next_id = Some(next_element.to_id)
-                }
-            }
-        }
-
-        if let Some(merge_with_next_id) = merge_with_next_id {
-            self.intervals.get_mut(index).unwrap().to_id = merge_with_next_id;
-            self.intervals.remove(index + 1);
-            return;
-        }
-
-        if index > 0 {
-            let mut merge_with_prev_id = None;
-
-            if let Some(prev_element) = self.intervals.get(index - 1) {
-                if let Some(element) = self.intervals.get(index) {
-                    if prev_element.to_id + 1 == element.from_id {
-                        merge_with_prev_id = Some(element.to_id)
-                    }
-                }
-            }
-
-            if let Some(merge_with_prev_id) = merge_with_prev_id {
-                self.intervals.get_mut(index - 1).unwrap().to_id = merge_with_prev_id;
-                self.intervals.remove(index);
-            }
-        }
-    }
-     */
-
-    /*
-       pub fn split(&self, id: i64) -> (Option<QueueWithIntervals>, Option<QueueWithIntervals>) {
-           let min_id = self.get_min_id();
-
-           if min_id.is_none() {
-               return (None, None);
-           }
-
-           let min_id = min_id.unwrap();
-
-           if id < min_id {
-               return (Some(self.clone()), None);
-           }
-
-           let max_id = self.get_max_id();
-
-           if max_id.is_none() {
-               return (None, None);
-           }
-
-           let max_id = max_id.unwrap();
-
-           if id > max_id {
-               return (Some(self.clone()), None);
-           }
-
-           let mut doing_left = true;
-           let mut left: Vec<QueueIndexRange> = Vec::new();
-           let mut right: Vec<QueueIndexRange> = Vec::new();
-
-           for interval in self.inner.iter() {
-               if doing_left {
-                   if interval.from_id <= id && id < interval.to_id {
-                       left.push(QueueIndexRange {
-                           from_id: interval.from_id,
-                           to_id: id,
-                       });
-
-                       doing_left = false;
-
-                       if id + 1 <= interval.to_id {
-                           right.push(QueueIndexRange {
-                               from_id: id + 1,
-                               to_id: interval.to_id,
-                           });
-                       }
-                   } else if interval.from_id < id && id == interval.to_id {
-                       left.push(QueueIndexRange {
-                           from_id: interval.from_id,
-                           to_id: interval.to_id,
-                       });
-
-                       doing_left = false;
-                   } else {
-                       left.push(interval.clone());
-                   }
-               } else {
-                   right.push(interval.clone())
-               }
-           }
-
-           (
-               Some(QueueWithIntervals::restore(left)),
-               Some(QueueWithIntervals::restore(right)),
-           )
-       }
-    */
     pub fn queue_size(&self) -> usize {
         let mut result = 0;
 
