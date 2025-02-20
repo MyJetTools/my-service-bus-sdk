@@ -22,6 +22,12 @@ impl QueueWithIntervals {
         }
     }
 
+    pub fn merge(&mut self, other: Self) {
+        for other_interval in other.intervals.into_iter().rev() {
+            self.enqueue_range(other_interval);
+        }
+    }
+
     pub fn get_interval(&self, index: usize) -> Option<&QueueIndexRange> {
         self.intervals.get(index)
     }
