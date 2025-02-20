@@ -3,10 +3,12 @@ use std::{
     sync::Arc,
 };
 
+use rust_extensions::date_time::DateTimeAsMicroseconds;
+
 use crate::{
     queue_with_intervals::QueueWithIntervals,
     subscriber::{MySbDeliveredMessage, MySbMessageDeserializer},
-    MessageId,
+    MessageId, MyServiceBusSubscriberClient,
 };
 
 use super::{CurrentMessage, SubscriberData};
@@ -20,6 +22,8 @@ pub struct MessagesReader<TMessageModel: MySbMessageDeserializer<Item = TMessage
     not_delivered: QueueWithIntervals,
     connection_id: i32,
     current_message: CurrentMessage<TMessageModel>,
+    last_time_confirmation: DateTimeAsMicroseconds,
+    intermediary_confirmation: Arc<dyn MyServiceBusSubscriberClient + Send + Sync + 'static>,
 }
 
 impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReader<TMessageModel> {
@@ -28,6 +32,7 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
         messages: VecDeque<MySbDeliveredMessage<TMessageModel>>,
         confirmation_id: i64,
         connection_id: i32,
+        intermediary_confirmation: Arc<dyn MyServiceBusSubscriberClient + Send + Sync + 'static>,
     ) -> Self {
         let total_messages_amount = messages.len();
         Self {
@@ -39,6 +44,8 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
             connection_id,
             current_message: CurrentMessage::None,
             not_delivered: QueueWithIntervals::new(),
+            last_time_confirmation: DateTimeAsMicroseconds::now(),
+            intermediary_confirmation,
         }
     }
 
@@ -67,6 +74,21 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
         &'s mut self,
     ) -> Option<&'s mut MySbDeliveredMessage<TMessageModel>> {
         self.handle_current_messages_as_ok();
+
+        let now = DateTimeAsMicroseconds::now();
+
+        let last_confirmation_time = now - self.last_time_confirmation;
+
+        if last_confirmation_time.get_full_seconds() >= 5 {
+            self.intermediary_confirmation.intermediary_confirm(
+                self.data.topic_id.as_str(),
+                self.data.queue_id.as_str(),
+                self.confirmation_id,
+                self.connection_id,
+                self.delivered.get_snapshot(),
+            );
+            self.last_time_confirmation = now;
+        }
 
         let messages = self.messages.as_mut()?;
         let next_message = messages.pop_front()?;

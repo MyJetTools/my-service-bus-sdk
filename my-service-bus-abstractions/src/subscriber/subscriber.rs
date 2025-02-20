@@ -152,8 +152,13 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync 
             return;
         }
 
-        let reader =
-            MessagesReader::new(self.data.clone(), messages, confirmation_id, connection_id);
+        let reader = MessagesReader::new(
+            self.data.clone(),
+            messages,
+            confirmation_id,
+            connection_id,
+            self.data.client.clone(),
+        );
 
         let callback = self.callback.clone();
 

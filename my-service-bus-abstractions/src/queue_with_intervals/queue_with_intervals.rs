@@ -1,5 +1,3 @@
-use rust_extensions::StrOrString;
-
 use crate::queue_with_intervals::queue_index_range::QueueIndexRange;
 
 use super::{iterator::QueueWithIntervalsIterator, *};
