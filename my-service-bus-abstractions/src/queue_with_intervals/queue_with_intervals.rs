@@ -8,6 +8,7 @@ use super::{iterator::QueueWithIntervalsIterator, *};
 pub enum QueueWithIntervalsError {
     MessagesNotFound,
     QueueIsEmpty,
+    MessageExists,
 }
 
 #[derive(Debug, Clone)]
@@ -122,98 +123,37 @@ impl QueueWithIntervals {
     }
 
     pub fn enqueue(&mut self, value: i64) {
-        let mut index = 0;
-
-        let mut prev_element: Option<QueueIndexRange> = None;
-        let mut insert_element: Option<QueueIndexRange> = None;
-        for item in &mut self.intervals {
-            if item.is_empty() {
-                item.from_id = value;
-                item.to_id = value;
+        if let Some(first) = self.intervals.first_mut() {
+            if first.is_empty() {
+                first.from_id = value;
+                first.to_id = value;
                 return;
             }
-
-            if item.is_in_my_interval_to_enqueue(value) {
-                if value == item.to_id + 1 {
-                    item.to_id = value;
-                } else if value == item.from_id - 1 {
-                    item.from_id = value;
-                }
-                break;
-            }
-
-            match &prev_element {
-                Some(prev_element) => {
-                    if prev_element.to_id < value && value < item.from_id {
-                        insert_element = Some(QueueIndexRange {
-                            from_id: value,
-                            to_id: value,
-                        });
-                        break;
-                    }
-                }
-                None => {
-                    if value < item.from_id {
-                        insert_element = Some(QueueIndexRange {
-                            from_id: value,
-                            to_id: value,
-                        });
-                        break;
-                    }
-                }
-            }
-
-            prev_element = Some(item.clone());
-
-            index += 1;
         }
 
-        if let Some(insert_element) = insert_element {
-            self.intervals.insert(index, insert_element);
-            return;
-        }
-
-        // Add Last Element
-        if index == self.intervals.len() {
-            if let Some(prev_element) = prev_element {
-                if value > prev_element.to_id {
-                    self.intervals.push(QueueIndexRange {
+        match IndexToInsertValue::new(&self.intervals, value) {
+            IndexToInsertValue::MergeToLeft(index) => {
+                self.intervals.get_mut(index).unwrap().from_id -= 1;
+            }
+            IndexToInsertValue::MergeToRight(index) => {
+                self.intervals.get_mut(index).unwrap().to_id += 1;
+            }
+            IndexToInsertValue::InsertAsNewInterval(index) => {
+                self.intervals.insert(
+                    index,
+                    QueueIndexRange {
                         from_id: value,
                         to_id: value,
-                    });
-                }
+                    },
+                );
             }
+            IndexToInsertValue::MergeTwoIntervals(index) => {
+                let value = self.intervals.remove(index + 1);
+                self.intervals.get_mut(index).unwrap().to_id = value.to_id;
+            }
+            IndexToInsertValue::HasValue => {}
         }
-
-        self.merge_if_needed(index);
     }
-
-    /*
-       fn compact_it(&mut self) {
-           let mut index = 0;
-           while index < self.inner.intervals_amount() - 1 {
-               let el_to_id = self.inner.get(index).unwrap().to_id;
-               let next = self.inner.get(index + 1).unwrap().clone();
-
-               if next.can_be_joined_to_interval_from_the_left(el_to_id) {
-                   let removed = self.inner.remove(index + 1);
-                   if let Some(removed) = removed {
-                       self.inner.get_mut(index).unwrap().to_id = removed.to_id;
-                   }
-
-                   continue;
-               }
-
-               index += 1;
-           }
-       }
-    */
-    /*
-    pub fn merge_with(&mut self, other_queue: &QueueWithIntervals) {
-        for range in other_queue.inner.iter() {
-            self.enqueue_range(range);
-        }
-    } */
 
     pub fn enqueue_range(&mut self, range_to_insert: QueueIndexRange) {
         if self.is_empty() {
@@ -451,6 +391,7 @@ impl QueueWithIntervals {
         false
     }
 
+    /*
     fn merge_if_needed(&mut self, index: usize) {
         let mut merge_with_next_id = None;
 
@@ -485,6 +426,7 @@ impl QueueWithIntervals {
             }
         }
     }
+     */
 
     /*
        pub fn split(&self, id: i64) -> (Option<QueueWithIntervals>, Option<QueueWithIntervals>) {
@@ -608,6 +550,9 @@ mod tests {
         queue.enqueue(6);
 
         assert_eq!(2, queue.queue_size());
+
+        assert_eq!(queue.intervals.get(0).unwrap().from_id, 5);
+        assert_eq!(queue.intervals.get(0).unwrap().to_id, 6);
 
         assert_eq!(5, queue.dequeue().unwrap());
         assert_eq!(6, queue.dequeue().unwrap());
