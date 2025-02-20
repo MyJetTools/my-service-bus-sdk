@@ -11,8 +11,15 @@ pub async fn send_greeting(
     app_version: &str,
     client_version: &str,
 ) {
+    let mut name = format!("{}:{};{}", app_name, app_version, client_version);
+
+    if let Ok(value) = std::env::var("ENV_INFO") {
+        name.push(';');
+        name.push_str(&value);
+    }
+
     let greeting = MySbTcpContract::Greeting {
-        name: format!("{}:{};{}", app_name, app_version, client_version),
+        name,
         protocol_version: DEFAULT_TCP_PROTOCOL_VERSION,
     };
 
