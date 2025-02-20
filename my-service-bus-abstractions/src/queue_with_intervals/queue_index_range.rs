@@ -73,9 +73,7 @@ impl QueueIndexRange {
         id >= self.from_id && id <= self.to_id
     }
 
-    pub fn reset(&mut self) {
-        self.to_id = self.from_id - 1;
-    }
+
 
     pub fn remove(&mut self, message_id: i64) -> RemoveResult {
 
@@ -183,6 +181,10 @@ impl QueueIndexRange {
 
     pub fn is_empty(&self) -> bool {
         self.to_id < self.from_id
+    }
+
+    pub fn make_empty(&mut self){
+        self.from_id = self.to_id+1;
     }
 
     pub fn is_before(&self, id: i64) -> bool {

@@ -38,6 +38,11 @@ impl QueueWithIntervals {
     }
 
     pub fn restore(mut intervals: Vec<QueueIndexRange>) -> Self {
+        if intervals.len() == 0 {
+            return Self {
+                intervals: vec![QueueIndexRange::new_empty(0)],
+            };
+        }
         intervals.sort_by_key(|itm| itm.from_id);
         Self { intervals }
     }
@@ -49,13 +54,23 @@ impl QueueWithIntervals {
     }
 
     pub fn reset(&mut self, mut intervals: Vec<QueueIndexRange>) {
+        if intervals.is_empty() {
+            self.clean();
+            return;
+        }
+
         intervals.sort_by_key(|itm| itm.from_id);
         self.intervals = intervals;
     }
 
     pub fn clean(&mut self) {
+        let to_id = self.intervals.last().unwrap().to_id;
+
         self.intervals.truncate(1);
-        self.intervals.get_mut(0).unwrap().reset();
+        let first = self.intervals.get_mut(0).unwrap();
+
+        first.to_id = to_id;
+        first.make_empty();
     }
 
     pub fn is_empty(&self) -> bool {
@@ -111,8 +126,10 @@ impl QueueWithIntervals {
             self.intervals.insert(index + 1, split.1);
             return Ok(());
         } else {
-            if self.intervals[index].is_empty() {
-                self.intervals.remove(index);
+            if self.intervals.len() > 1 {
+                if self.intervals[index].is_empty() {
+                    self.remove_interval(index);
+                }
             }
         }
 
@@ -120,6 +137,19 @@ impl QueueWithIntervals {
             return Ok(());
         }
         return Err(QueueWithIntervalsError::MessagesNotFound);
+    }
+
+    fn remove_interval(&mut self, index: usize) {
+        if self.intervals.len() > 1 {
+            self.intervals.remove(index);
+            return;
+        }
+
+        let first = self.intervals.first_mut().unwrap();
+
+        if !first.is_empty() {
+            first.make_empty()
+        }
     }
 
     pub fn enqueue(&mut self, value: i64) {
@@ -149,6 +179,9 @@ impl QueueWithIntervals {
             }
             IndexToInsertValue::MergeTwoIntervals(index) => {
                 let value = self.intervals.remove(index + 1);
+                if self.intervals.len() == 0 {
+                    panic!("Somehow intervals got empty");
+                }
                 self.intervals.get_mut(index).unwrap().to_id = value.to_id;
             }
             IndexToInsertValue::HasValue => {}
@@ -279,6 +312,9 @@ impl QueueWithIntervals {
         for _ in from_index..to_index {
             self.intervals.remove(from_index + 1);
         }
+        if self.intervals.len() == 0 {
+            panic!("Somehow intervals got empty");
+        }
 
         let first = self.intervals.get_mut(from_index).unwrap();
         first.from_id = range_to_insert.from_id;
@@ -294,6 +330,9 @@ impl QueueWithIntervals {
         for _ in from_index..to_index {
             self.intervals.remove(from_index + 1);
         }
+        if self.intervals.len() == 0 {
+            panic!("Somehow intervals got empty");
+        }
 
         let first = self.intervals.get_mut(from_index).unwrap();
         first.to_id = range_to_insert.to_id;
@@ -308,6 +347,9 @@ impl QueueWithIntervals {
         for _ in from_index..to_index {
             self.intervals.remove(from_index + 1);
         }
+        if self.intervals.len() == 0 {
+            panic!("Somehow intervals got empty");
+        }
 
         let first = self.intervals.get_mut(from_index).unwrap();
         first.from_id = range_to_insert.from_id;
@@ -318,7 +360,7 @@ impl QueueWithIntervals {
         let to_id = self.intervals.get(to_index).unwrap().to_id;
 
         for _ in from_index..to_index {
-            self.intervals.remove(from_index + 1);
+            self.remove_interval(from_index + 1);
         }
 
         let first = self.intervals.get_mut(from_index).unwrap();
@@ -339,9 +381,7 @@ impl QueueWithIntervals {
         };
 
         if is_empty {
-            if self.intervals.len() > 1 {
-                self.intervals.remove(0);
-            }
+            self.remove_interval(0);
         }
 
         Some(result)
@@ -455,7 +495,11 @@ mod tests {
         assert_eq!(queue.intervals.get(0).unwrap().to_id, 6);
 
         assert_eq!(5, queue.dequeue().unwrap());
+        assert_eq!(queue.intervals.get(0).unwrap().from_id, 6);
+        assert_eq!(queue.intervals.get(0).unwrap().to_id, 6);
         assert_eq!(6, queue.dequeue().unwrap());
+        assert!(queue.intervals.get(0).unwrap().is_empty());
+
         assert_eq!(true, queue.dequeue().is_none());
     }
 
