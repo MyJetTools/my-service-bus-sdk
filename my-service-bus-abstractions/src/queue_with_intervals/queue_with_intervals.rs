@@ -562,6 +562,10 @@ impl QueueWithIntervals {
 
         result as usize
     }
+
+    pub fn iter(&self) -> QueueWithIntervalsIterator {
+        QueueWithIntervalsIterator::new(self.clone())
+    }
 }
 
 impl IntoIterator for QueueWithIntervals {
