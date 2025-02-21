@@ -45,11 +45,17 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>>
         }
     }
 
-    pub async fn mark_as_delivered(&mut self) {
+    pub async fn mark_as_delivered(&self) {
         let inner = self.inner.as_ref().unwrap();
         let mut inner = inner.lock().await;
         if let Some(message_id) = inner.current_message_id.take() {
             inner.delivered.enqueue(message_id.get_value());
+        }
+    }
+
+    pub fn engage_telemetry(&mut self) {
+        if let Some(my_telemetry) = self.my_telemetry.as_mut() {
+            my_telemetry.engage_telemetry();
         }
     }
 }
