@@ -1,8 +1,12 @@
+use std::sync::Arc;
+
+use tokio::sync::Mutex;
+
 #[cfg(feature = "with-telemetry")]
 use super::DeliveredMessageTelemetry;
 use crate::{MessageId, SbMessageHeaders};
 
-use super::MySbMessageDeserializer;
+use super::{MessagesReaderInner, MySbMessageDeserializer};
 
 pub struct MySbDeliveredMessage<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> {
     pub id: MessageId,
@@ -12,9 +16,10 @@ pub struct MySbDeliveredMessage<TMessageModel: MySbMessageDeserializer<Item = TM
     pub content: Option<TMessageModel>,
     #[cfg(feature = "with-telemetry")]
     pub my_telemetry: DeliveredMessageTelemetry,
+    pub(crate) inner: Option<Arc<Mutex<MessagesReaderInner<TMessageModel>>>>,
 }
 
-impl<'s, TMessageModel: MySbMessageDeserializer<Item = TMessageModel>>
+impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>>
     MySbDeliveredMessage<TMessageModel>
 {
     pub fn take_message(&mut self) -> TMessageModel {
@@ -31,5 +36,18 @@ impl<'s, TMessageModel: MySbMessageDeserializer<Item = TMessageModel>>
             return itm;
         }
         panic!("Message was already taken");
+    }
+
+    pub async fn mark_as_not_delivered(&self) {
+        let inner = self.inner.as_ref().unwrap();
+        let mut inner = inner.lock().await;
+
+        inner.not_delivered.enqueue(self.id.get_value());
+    }
+
+    pub async fn mark_as_delivered(&mut self) {
+        let inner = self.inner.as_ref().unwrap();
+        let mut inner = inner.lock().await;
+        inner.delivered.enqueue(self.id.get_value());
     }
 }

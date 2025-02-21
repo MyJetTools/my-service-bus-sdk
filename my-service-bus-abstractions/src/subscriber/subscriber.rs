@@ -103,6 +103,7 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync 
                         raw: msg.content,
                         #[cfg(feature = "with-telemetry")]
                         my_telemetry,
+                        inner: None,
                     };
 
                     messages.push_back(msg);

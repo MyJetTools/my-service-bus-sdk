@@ -11,6 +11,6 @@ pub trait SubscriberCallback<
 {
     async fn handle_messages(
         &self,
-        messages_reader: &mut MessagesReader<TMessageModel>,
+        messages_reader: &MessagesReader<TMessageModel>,
     ) -> Result<(), MySbSubscriberHandleError>;
 }

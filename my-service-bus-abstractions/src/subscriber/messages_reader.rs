@@ -4,30 +4,30 @@ use std::{
 };
 
 use rust_extensions::date_time::DateTimeAsMicroseconds;
+use tokio::sync::Mutex;
 
 use crate::{
-    queue_with_intervals::QueueWithIntervals,
     subscriber::{MySbDeliveredMessage, MySbMessageDeserializer},
-    MessageId, MyServiceBusSubscriberClient,
+    MyServiceBusSubscriberClient,
 };
 
-use super::{CurrentMessage, SubscriberData};
+use super::{MessagesReaderInner, SubscriberData};
 
-pub struct MessagesReader<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> {
+pub struct MessagesReader<
+    TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync + 'static,
+> {
     pub data: Arc<SubscriberData>,
     total_messages_amount: usize,
-    messages: Option<VecDeque<MySbDeliveredMessage<TMessageModel>>>,
+
     pub confirmation_id: i64,
-    delivered: QueueWithIntervals,
-    not_delivered: QueueWithIntervals,
+    inner: Arc<Mutex<MessagesReaderInner<TMessageModel>>>,
     connection_id: i32,
-    current_message: CurrentMessage<TMessageModel>,
-    last_time_confirmation: DateTimeAsMicroseconds,
     intermediary_confirmation: Arc<dyn MyServiceBusSubscriberClient + Send + Sync + 'static>,
-    prev_intermediary_confirmation_queue: QueueWithIntervals,
 }
 
-impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReader<TMessageModel> {
+impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync + 'static>
+    MessagesReader<TMessageModel>
+{
     pub fn new(
         data: Arc<SubscriberData>,
         messages: VecDeque<MySbDeliveredMessage<TMessageModel>>,
@@ -38,80 +38,47 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
         let total_messages_amount = messages.len();
         Self {
             data,
-            messages: Some(messages),
             confirmation_id,
-            delivered: QueueWithIntervals::new(),
             total_messages_amount,
             connection_id,
-            current_message: CurrentMessage::None,
-            not_delivered: QueueWithIntervals::new(),
-            last_time_confirmation: DateTimeAsMicroseconds::now(),
+            inner: Arc::new(Mutex::new(MessagesReaderInner::new(messages))),
             intermediary_confirmation,
-            prev_intermediary_confirmation_queue: QueueWithIntervals::new(),
         }
     }
 
-    fn handled_ok(&mut self, msg: &mut MySbDeliveredMessage<TMessageModel>) {
-        #[cfg(feature = "with-telemetry")]
-        msg.my_telemetry.enabled_duration_tracking_on_confirmation();
+    pub async fn get_next_message(&self) -> Option<MySbDeliveredMessage<TMessageModel>> {
+        let mut inner = self.inner.lock().await;
 
-        if !self.not_delivered.has_message(msg.id.get_value()) {
-            self.delivered.enqueue(msg.id.get_value());
+        if let Some(message_id) = inner.current_message_id.take() {
+            inner.handled_message_id_as_ok(message_id).await;
         }
-    }
-
-    fn handle_current_messages_as_ok(&mut self) {
-        match self.current_message.take() {
-            CurrentMessage::Single(mut msg) => self.handled_ok(&mut msg),
-            CurrentMessage::Multiple(msgs) => {
-                for mut msg in msgs {
-                    self.handled_ok(&mut msg)
-                }
-            }
-            CurrentMessage::None => {}
-        }
-    }
-
-    pub fn get_next_message<'s>(
-        &'s mut self,
-    ) -> Option<&'s mut MySbDeliveredMessage<TMessageModel>> {
-        self.handle_current_messages_as_ok();
 
         let now = DateTimeAsMicroseconds::now();
 
-        let last_confirmation_time = now - self.last_time_confirmation;
+        let last_confirmation_time = now - inner.last_time_confirmation;
 
         if last_confirmation_time.get_full_seconds() >= 5 {
-            if self.prev_intermediary_confirmation_queue.len() != self.delivered.len() {
+            if inner.prev_intermediary_confirmation_queue.len() != inner.delivered.len() {
                 self.intermediary_confirmation.intermediary_confirm(
                     self.data.topic_id.as_str(),
                     self.data.queue_id.as_str(),
                     self.confirmation_id,
                     self.connection_id,
-                    self.delivered.get_snapshot(),
+                    inner.delivered.get_snapshot(),
                 );
 
-                self.prev_intermediary_confirmation_queue = self.delivered.clone();
-                self.last_time_confirmation = now;
+                inner.prev_intermediary_confirmation_queue = inner.delivered.clone();
+                inner.last_time_confirmation = now;
             }
         }
 
-        let messages = self.messages.as_mut()?;
-        let next_message = messages.pop_front()?;
-        self.current_message = CurrentMessage::Single(next_message);
-        Some(self.current_message.unwrap_as_single_message_mut())
+        let mut next_message = inner.messages.pop_front()?;
+        next_message.inner = self.inner.clone().into();
+        inner.current_message_id = Some(next_message.id);
+        Some(next_message)
     }
 
-    pub fn mark_as_not_delivered(&mut self, message_id: MessageId) {
-        let message_id = message_id.get_value();
-        self.not_delivered.enqueue(message_id);
-        let _ = self.delivered.remove(message_id);
-    }
-
-    pub fn force_mark_as_delivered(&mut self) {
-        self.handle_current_messages_as_ok();
-    }
-
+    /*
     pub fn get_all<'s>(
         &'s mut self,
     ) -> Option<std::collections::vec_deque::IterMut<'s, MySbDeliveredMessage<TMessageModel>>> {
@@ -124,113 +91,108 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
         self.current_message = CurrentMessage::Multiple(result);
         Some(self.current_message.unwrap_as_iterator())
     }
+     */
 }
 
-impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> Drop
+impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync + 'static> Drop
     for MessagesReader<TMessageModel>
 {
     fn drop(&mut self) {
-        let mut debug = false;
-        if let Ok(debug_topic) = std::env::var("DEBUG_TOPIC") {
-            if debug_topic == self.data.topic_id.as_str() {
-                debug = true;
-            }
-        };
+        let inner = self.inner.clone();
+        let data = self.data.clone();
 
-        if debug {
-            println!(
-                "Confirmation: Topic: {}, Queue:{}, Total Amount: {}, Delivered Amount: {},  Not Delivered amount: {}",
-                self.data.topic_id.as_str(),
-                self.data.queue_id.as_str(),
-                self.total_messages_amount,
-                self.delivered.queue_size(),
-                self.not_delivered.queue_size()
-            );
-        }
-        if self.delivered.queue_size() == self.total_messages_amount {
-            self.data.client.confirm_delivery(
-                self.data.topic_id.as_str(),
-                self.data.queue_id.as_str(),
-                self.confirmation_id,
-                self.connection_id,
-                true,
-            );
+        let total_messages_amount = self.total_messages_amount;
+        let confirmation_id = self.confirmation_id;
+        let connection_id = self.connection_id;
 
-            if debug {
-                println!("All messages confirmed as Delivered")
-            }
-        } else if self.delivered.queue_size() == 0 {
-            let mut log_context = HashMap::new();
-            log_context.insert(
-                "ConfirmationId".to_string(),
-                self.confirmation_id.to_string(),
-            );
+        tokio::spawn(async move {
+            let mut debug = false;
+            if let Ok(debug_topic) = std::env::var("DEBUG_TOPIC") {
+                if debug_topic == data.topic_id.as_str() {
+                    debug = true;
+                }
+            };
 
-            log_context.insert(
-                "TopicId".to_string(),
-                self.data.topic_id.as_str().to_string(),
-            );
-            log_context.insert(
-                "QueueId".to_string(),
-                self.data.queue_id.as_str().to_string(),
-            );
-
-            self.data.logger.write_error(
-                "Sending delivery confirmation".to_string(),
-                "All messages confirmed as fail".to_string(),
-                Some(log_context),
-            );
-
-            self.data.client.confirm_delivery(
-                self.data.topic_id.as_str(),
-                self.data.queue_id.as_str(),
-                self.confirmation_id,
-                self.connection_id,
-                false,
-            );
-
-            if debug {
-                println!("All messages confirmed as not Delivered")
-            }
-        } else {
-            let mut log_context = HashMap::new();
-            log_context.insert(
-                "ConfirmationId".to_string(),
-                self.confirmation_id.to_string(),
-            );
-
-            log_context.insert(
-                "TopicId".to_string(),
-                self.data.topic_id.as_str().to_string(),
-            );
-            log_context.insert(
-                "QueueId".to_string(),
-                self.data.queue_id.as_str().to_string(),
-            );
-
-            self.data.logger.write_error(
-                "Sending delivery confirmation".to_string(),
-                format!(
-                    "{} messages out of {} confirmed as Delivered",
-                    self.delivered.queue_size(),
-                    self.total_messages_amount
-                ),
-                Some(log_context),
-            );
-            self.data.client.confirm_some_messages_ok(
-                self.data.topic_id.as_str(),
-                self.data.queue_id.as_str(),
-                self.confirmation_id,
-                self.connection_id,
-                self.delivered.get_snapshot(),
-            );
+            let inner = inner.lock().await;
 
             if debug {
                 println!(
-                    "Some messages {:?} confirmed as not Delivered",
-                    self.delivered.get_snapshot()
-                )
+                    "Confirmation: Topic: {}, Queue:{}, Total Amount: {}, Delivered Amount: {},  Not Delivered amount: {}",
+                    data.topic_id.as_str(),
+                    data.queue_id.as_str(),
+                    total_messages_amount,
+                    inner.delivered.queue_size(),
+                    inner.not_delivered.queue_size()
+                );
             }
-        };
+
+            if inner.delivered.queue_size() == total_messages_amount {
+                data.client.confirm_delivery(
+                    data.topic_id.as_str(),
+                    data.queue_id.as_str(),
+                    confirmation_id,
+                    connection_id,
+                    true,
+                );
+
+                if debug {
+                    println!("All messages confirmed as Delivered")
+                }
+            } else if inner.delivered.queue_size() == 0 {
+                let mut log_context = HashMap::new();
+                log_context.insert("ConfirmationId".to_string(), confirmation_id.to_string());
+
+                log_context.insert("TopicId".to_string(), data.topic_id.as_str().to_string());
+                log_context.insert("QueueId".to_string(), data.queue_id.as_str().to_string());
+
+                data.logger.write_error(
+                    "Sending delivery confirmation".to_string(),
+                    "All messages confirmed as fail".to_string(),
+                    Some(log_context),
+                );
+
+                data.client.confirm_delivery(
+                    data.topic_id.as_str(),
+                    data.queue_id.as_str(),
+                    confirmation_id,
+                    connection_id,
+                    false,
+                );
+
+                if debug {
+                    println!("All messages confirmed as not Delivered")
+                }
+            } else {
+                let mut log_context = HashMap::new();
+                log_context.insert("ConfirmationId".to_string(), confirmation_id.to_string());
+
+                log_context.insert("TopicId".to_string(), data.topic_id.as_str().to_string());
+                log_context.insert("QueueId".to_string(), data.queue_id.as_str().to_string());
+
+                data.logger.write_error(
+                    "Sending delivery confirmation".to_string(),
+                    format!(
+                        "{} messages out of {} confirmed as Delivered",
+                        inner.delivered.queue_size(),
+                        total_messages_amount
+                    ),
+                    Some(log_context),
+                );
+                data.client.confirm_some_messages_ok(
+                    data.topic_id.as_str(),
+                    data.queue_id.as_str(),
+                    confirmation_id,
+                    connection_id,
+                    inner.delivered.get_snapshot(),
+                );
+
+                if debug {
+                    println!(
+                        "Some messages {:?} confirmed as not Delivered",
+                        inner.delivered.get_snapshot()
+                    )
+                }
+            };
+        });
     }
 }

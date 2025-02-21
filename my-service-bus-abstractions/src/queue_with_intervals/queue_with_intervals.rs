@@ -16,6 +16,11 @@ pub struct QueueWithIntervals {
     intervals: Vec<QueueIndexRange>,
 }
 
+impl Default for QueueWithIntervals {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl QueueWithIntervals {
     pub fn new() -> QueueWithIntervals {
         Self {
