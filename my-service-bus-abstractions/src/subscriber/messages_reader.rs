@@ -24,6 +24,7 @@ pub struct MessagesReader<TMessageModel: MySbMessageDeserializer<Item = TMessage
     current_message: CurrentMessage<TMessageModel>,
     last_time_confirmation: DateTimeAsMicroseconds,
     intermediary_confirmation: Arc<dyn MyServiceBusSubscriberClient + Send + Sync + 'static>,
+    prev_intermediary_confirmation_queue: QueueWithIntervals,
 }
 
 impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReader<TMessageModel> {
@@ -46,6 +47,7 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
             not_delivered: QueueWithIntervals::new(),
             last_time_confirmation: DateTimeAsMicroseconds::now(),
             intermediary_confirmation,
+            prev_intermediary_confirmation_queue: QueueWithIntervals::new(),
         }
     }
 
@@ -80,14 +82,18 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> MessagesReade
         let last_confirmation_time = now - self.last_time_confirmation;
 
         if last_confirmation_time.get_full_seconds() >= 5 {
-            self.intermediary_confirmation.intermediary_confirm(
-                self.data.topic_id.as_str(),
-                self.data.queue_id.as_str(),
-                self.confirmation_id,
-                self.connection_id,
-                self.delivered.get_snapshot(),
-            );
-            self.last_time_confirmation = now;
+            if self.prev_intermediary_confirmation_queue.len() != self.delivered.len() {
+                self.intermediary_confirmation.intermediary_confirm(
+                    self.data.topic_id.as_str(),
+                    self.data.queue_id.as_str(),
+                    self.confirmation_id,
+                    self.connection_id,
+                    self.delivered.get_snapshot(),
+                );
+
+                self.prev_intermediary_confirmation_queue = self.delivered.clone();
+                self.last_time_confirmation = now;
+            }
         }
 
         let messages = self.messages.as_mut()?;
