@@ -53,12 +53,14 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>>
         }
     }
     #[cfg(feature = "with-telemetry")]
-    pub async fn engage_telemetry(&self) {
+    pub async fn engage_telemetry(&self) -> my_telemetry::MyTelemetryContext {
         let inner = self.inner.as_ref().unwrap();
         let mut inner = inner.lock().await;
 
         if let Some(my_telemetry) = inner.current_message_telemetry.as_mut() {
-            my_telemetry.engage_telemetry();
+            return my_telemetry.engage_telemetry();
         }
+
+        my_telemetry::MyTelemetryContext::Empty
     }
 }
