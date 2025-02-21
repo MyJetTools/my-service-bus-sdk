@@ -52,7 +52,7 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>>
             inner.delivered.enqueue(message_id.get_value());
         }
     }
-
+    #[cfg(feature = "with-telemetry")]
     pub fn engage_telemetry(&mut self) {
         if let Some(my_telemetry) = self.my_telemetry.as_mut() {
             my_telemetry.engage_telemetry();
