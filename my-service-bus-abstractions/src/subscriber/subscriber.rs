@@ -163,30 +163,57 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync 
 
         let callback = self.callback.clone();
 
-        tokio::spawn(async move {
-            let mut reader = reader;
+        tokio::spawn(callback_new_messages(
+            reader,
+            callback,
+            self.data.clone(),
+            confirmation_id,
+            connection_id,
+        ));
+    }
+}
 
-            if let Err(err) = callback.handle_messages(&mut reader).await {
-                let mut ctx = HashMap::new();
+async fn callback_new_messages<
+    TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync + 'static,
+>(
+    mut reader: MessagesReader<TMessageModel>,
+    callback: Arc<dyn SubscriberCallback<TMessageModel> + Send + Sync + 'static>,
+    data: Arc<SubscriberData>,
+    confirmation_id: i64,
+    connection_id: i32,
+) {
+    let task = tokio::spawn(async move {
+        if let Err(err) = callback.handle_messages(&mut reader).await {
+            let mut ctx = HashMap::new();
 
-                ctx.insert(
-                    "topicId".to_string(),
-                    reader.data.topic_id.as_str().to_string(),
-                );
-                ctx.insert(
-                    "queueId".to_string(),
-                    reader.data.queue_id.as_str().to_string(),
-                );
-                ctx.insert(
-                    "confirmationId".to_string(),
-                    reader.confirmation_id.to_string(),
-                );
-                reader.data.logger.write_fatal_error(
-                    "new_events".to_string(),
-                    format!("Can not handle messages. Err: {}", err.msg),
-                    Some(ctx),
-                );
-            }
-        });
+            ctx.insert(
+                "topicId".to_string(),
+                reader.data.topic_id.as_str().to_string(),
+            );
+            ctx.insert(
+                "queueId".to_string(),
+                reader.data.queue_id.as_str().to_string(),
+            );
+            ctx.insert(
+                "confirmationId".to_string(),
+                reader.confirmation_id.to_string(),
+            );
+            reader.data.logger.write_fatal_error(
+                "new_events".to_string(),
+                format!("Can not handle messages. Err: {}", err.msg),
+                Some(ctx),
+            );
+        }
+    })
+    .await;
+
+    if task.is_err() {
+        data.client.confirm_delivery(
+            data.topic_id.as_str(),
+            data.queue_id.as_str(),
+            confirmation_id,
+            connection_id,
+            false,
+        );
     }
 }

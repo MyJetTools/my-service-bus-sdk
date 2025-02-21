@@ -88,21 +88,6 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync 
 
         Some(next_message)
     }
-
-    /*
-    pub fn get_all<'s>(
-        &'s mut self,
-    ) -> Option<std::collections::vec_deque::IterMut<'s, MySbDeliveredMessage<TMessageModel>>> {
-        self.handle_current_messages_as_ok();
-
-        let result = self.messages.take();
-
-        let result = result?;
-
-        self.current_message = CurrentMessage::Multiple(result);
-        Some(self.current_message.unwrap_as_iterator())
-    }
-     */
 }
 
 impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync + 'static> Drop
