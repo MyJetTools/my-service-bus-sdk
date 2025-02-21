@@ -86,57 +86,29 @@ impl QueueWithIntervals {
             return Err(QueueWithIntervalsError::QueueIsEmpty);
         }
 
-        let mut index = 0;
-        let mut split = None;
+        let index = IndexToRemoveValue::new(&self.intervals, value);
 
-        let mut removed = false;
-        for interval in &mut self.intervals {
-            if interval.is_in_my_interval(value) {
-                if interval.from_id == value {
-                    interval.from_id += 1;
-                    removed = true;
-                    break;
-                }
-
-                if interval.to_id == value {
-                    interval.to_id -= 1;
-                    removed = true;
-                    break;
-                }
-
-                split = Some((
-                    QueueIndexRange {
-                        from_id: interval.from_id,
-                        to_id: value - 1,
-                    },
-                    QueueIndexRange {
-                        from_id: value + 1,
-                        to_id: interval.to_id,
-                    },
-                ));
-
-                removed = true;
-                break;
+        match index {
+            IndexToRemoveValue::IncLeft(index) => {
+                self.intervals.get_mut(index).unwrap().from_id += 1;
             }
-            index += 1;
-        }
 
-        if let Some(split) = split {
-            self.intervals[index] = split.0;
-            self.intervals.insert(index + 1, split.1);
-            return Ok(());
-        } else {
-            if self.intervals.len() > 1 {
-                if self.intervals[index].is_empty() {
-                    self.remove_interval(index);
-                }
+            IndexToRemoveValue::DecRight(index) => {
+                self.intervals.get_mut(index).unwrap().to_id -= 1;
             }
+            IndexToRemoveValue::Split { index, left, right } => {
+                self.intervals.insert(index + 1, right);
+                let left_part = self.intervals.get_mut(index).unwrap();
+                left_part.from_id = left.from_id;
+                left_part.to_id = left.to_id;
+            }
+            IndexToRemoveValue::Remove(index) => {
+                self.remove_interval(index);
+            }
+            IndexToRemoveValue::NoValue => return Err(QueueWithIntervalsError::MessagesNotFound),
         }
 
-        if removed {
-            return Ok(());
-        }
-        return Err(QueueWithIntervalsError::MessagesNotFound);
+        Ok(())
     }
 
     fn remove_interval(&mut self, index: usize) {
@@ -601,6 +573,12 @@ mod tests {
         queue.remove(202).unwrap();
         assert_eq!(2, queue.intervals.len());
 
+        assert_eq!(200, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(201, queue.intervals.get(0).unwrap().to_id);
+
+        assert_eq!(203, queue.intervals.get(1).unwrap().from_id);
+        assert_eq!(206, queue.intervals.get(1).unwrap().to_id);
+
         queue.remove(205).unwrap();
         assert_eq!(3, queue.intervals.len());
 
@@ -622,6 +600,25 @@ mod tests {
 
         assert_eq!(206, queue.intervals.get(1).unwrap().from_id);
         assert_eq!(206, queue.intervals.get(1).unwrap().to_id);
+
+        queue.remove(206).unwrap();
+
+        assert_eq!(1, queue.intervals.len());
+
+        assert_eq!(200, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(201, queue.intervals.get(0).unwrap().to_id);
+
+        queue.remove(201).unwrap();
+
+        assert_eq!(1, queue.intervals.len());
+
+        assert_eq!(200, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(200, queue.intervals.get(0).unwrap().to_id);
+
+        queue.remove(200).unwrap();
+
+        assert_eq!(1, queue.intervals.len());
+        assert!(queue.intervals.get(0).unwrap().is_empty());
     }
 
     #[test]

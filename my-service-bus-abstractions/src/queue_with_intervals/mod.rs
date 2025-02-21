@@ -12,3 +12,5 @@ mod index_to_insert_range;
 pub use index_to_insert_range::*;
 mod index_to_insert_value;
 pub use index_to_insert_value::*;
+mod index_to_remove;
+pub use index_to_remove::*;
