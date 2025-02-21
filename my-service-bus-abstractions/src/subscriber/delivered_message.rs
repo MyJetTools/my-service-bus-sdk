@@ -13,7 +13,7 @@ pub struct MySbDeliveredMessage<TMessageModel: MySbMessageDeserializer<Item = TM
     pub raw: Vec<u8>,
     pub content: Option<TMessageModel>,
     #[cfg(feature = "with-telemetry")]
-    pub my_telemetry: Option<super::DeliveredMessageTelemetry>,
+    pub(crate) my_telemetry: Option<super::DeliveredMessageTelemetry>,
     pub(crate) inner: Option<Arc<Mutex<MessagesReaderInner<TMessageModel>>>>,
 }
 
@@ -53,8 +53,11 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>>
         }
     }
     #[cfg(feature = "with-telemetry")]
-    pub fn engage_telemetry(&mut self) {
-        if let Some(my_telemetry) = self.my_telemetry.as_mut() {
+    pub async fn engage_telemetry(&self) {
+        let inner = self.inner.as_ref().unwrap();
+        let mut inner = inner.lock().await;
+
+        if let Some(my_telemetry) = inner.current_message_telemetry.as_mut() {
             my_telemetry.engage_telemetry();
         }
     }
