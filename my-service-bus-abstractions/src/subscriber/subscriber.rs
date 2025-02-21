@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, VecDeque},
     sync::Arc,
+    time::Duration,
 };
 
 use rust_extensions::{Logger, StrOrString};
@@ -208,6 +209,7 @@ async fn callback_new_messages<
     .await;
 
     if task.is_err() {
+        tokio::time::sleep(Duration::from_millis(300)).await;
         data.client.confirm_delivery(
             data.topic_id.as_str(),
             data.queue_id.as_str(),
