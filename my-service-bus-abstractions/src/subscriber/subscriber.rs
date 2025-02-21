@@ -102,7 +102,7 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync 
                         content: Some(contract),
                         raw: msg.content,
                         #[cfg(feature = "with-telemetry")]
-                        my_telemetry,
+                        my_telemetry: Some(my_telemetry),
                         inner: None,
                     };
 

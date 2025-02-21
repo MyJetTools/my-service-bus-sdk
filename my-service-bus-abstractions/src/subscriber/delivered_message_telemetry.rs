@@ -40,7 +40,7 @@ impl DeliveredMessageTelemetry {
     fn create_brand_new_telemetry(message_id: MessageId, telemetry_event_name: String) -> Self {
         Self {
             telemetry_event_name: Some(telemetry_event_name),
-            ctx: MyTelemetryContext::new(),
+            ctx: MyTelemetryContext::create_empty(),
             event_duration_tracker: None,
             ignore_this_event: true,
 

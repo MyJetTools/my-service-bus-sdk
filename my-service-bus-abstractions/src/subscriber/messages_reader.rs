@@ -50,7 +50,13 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync 
         let mut inner = self.inner.lock().await;
 
         if let Some(message_id) = inner.current_message_id.take() {
-            inner.handled_message_id_as_ok(message_id).await;
+            #[cfg(feature = "with-telemetry")]
+            let my_telemetry = inner.current_message_telemetry.take();
+            inner.handled_message_id_as_ok(
+                message_id,
+                #[cfg(feature = "with-telemetry")]
+                my_telemetry,
+            );
         }
 
         let now = DateTimeAsMicroseconds::now();
@@ -74,7 +80,12 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync 
 
         let mut next_message = inner.messages.pop_front()?;
         next_message.inner = self.inner.clone().into();
-        inner.current_message_id = Some(next_message.id);
+        inner.set_current_message(
+            next_message.id,
+            #[cfg(feature = "with-telemetry")]
+            next_message.my_telemetry.take(),
+        );
+
         Some(next_message)
     }
 
