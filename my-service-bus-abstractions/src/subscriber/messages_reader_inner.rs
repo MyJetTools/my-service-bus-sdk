@@ -8,7 +8,6 @@ use super::{MySbDeliveredMessage, MySbMessageDeserializer};
 
 pub struct MessagesReaderInner<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> {
     pub delivered: QueueWithIntervals,
-    pub not_delivered: QueueWithIntervals,
     pub prev_intermediary_confirmation_queue: QueueWithIntervals,
     pub last_time_confirmation: DateTimeAsMicroseconds,
     pub current_message_id: Option<MessageId>,
@@ -23,7 +22,6 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>>
     pub fn new(messages: VecDeque<MySbDeliveredMessage<TMessageModel>>) -> Self {
         Self {
             delivered: QueueWithIntervals::new(),
-            not_delivered: QueueWithIntervals::new(),
             last_time_confirmation: DateTimeAsMicroseconds::now(),
             prev_intermediary_confirmation_queue: QueueWithIntervals::new(),
             current_message_id: None,

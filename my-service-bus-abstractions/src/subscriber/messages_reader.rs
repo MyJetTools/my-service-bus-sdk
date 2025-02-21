@@ -113,12 +113,11 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync 
 
             if debug {
                 println!(
-                    "Confirmation: Topic: {}, Queue:{}, Total Amount: {}, Delivered Amount: {},  Not Delivered amount: {}",
+                    "Confirmation: Topic: {}, Queue:{}, Total Amount: {}, Delivered Amount: {}",
                     data.topic_id.as_str(),
                     data.queue_id.as_str(),
                     total_messages_amount,
                     inner.delivered.queue_size(),
-                    inner.not_delivered.queue_size()
                 );
             }
 

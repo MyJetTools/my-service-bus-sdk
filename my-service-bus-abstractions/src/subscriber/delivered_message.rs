@@ -40,9 +40,7 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>>
         let inner = self.inner.as_ref().unwrap();
         let mut inner = inner.lock().await;
 
-        if let Some(message_id) = inner.current_message_id.take() {
-            inner.not_delivered.enqueue(message_id.get_value());
-        }
+        inner.current_message_id.take();
     }
 
     pub async fn mark_as_delivered(&self) {
