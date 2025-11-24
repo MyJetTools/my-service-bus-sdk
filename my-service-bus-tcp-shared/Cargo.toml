@@ -18,10 +18,3 @@ rust-extensions = { tag = "0.1.5", git = "https://github.com/MyJetTools/rust-ext
 tokio = { version = "*", features = ["full"] }
 tokio-util = "*"
 async-trait = "*"
-
-
-# Automatically enable unix-socket feature on Unix targets
-[target.'cfg(unix)'.dependencies]
-my-tcp-sockets = { tag = "0.1.12", git = "https://github.com/MyJetTools/my-tcp-sockets.git", features = [
-    "unix-socket",
-] }
