@@ -19,10 +19,3 @@ tokio = { version = "*", features = ["full"] }
 tokio-util = "*"
 chrono = "*"
 async-trait = "*"
-
-
-# Automatically enable unix-socket feature on Unix targets
-[target.'cfg(unix)'.dependencies]
-my-tcp-sockets = { tag = "0.1.12", git = "https://github.com/MyJetTools/my-tcp-sockets.git", features = [
-    "unix-socket",
-] }
