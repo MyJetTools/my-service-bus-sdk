@@ -1,24 +1,16 @@
+# My Service Bus SDK – Quick Notes
 
-Add to Cargo.toml file
+This file captures the observed behavior and usage patterns from `my-service-bus-sdk` ([repo](https://github.com/MyJetTools/my-service-bus-sdk)).
 
-```toml
-[dependencies]
-my-service-bus-tcp-client = { tag = "xxx", git = "https://github.com/MyJetTools/my-service-bus-tcp-client.git" }
-my-service-bus-shared = { tag = "xxx", git = "https://github.com/MyJetTools/my-service-bus-shared.git" }
+## Dependencies
+- `my-service-bus-tcp-client` (plus `my-service-bus-shared`)
+- `tokio` with `full` features
 
-tokio = { version = "*", features = ["full"] }
-tokio-util = "*"
-```
-
-Setup MySbConnection Settings Reader. MyServiceBus will use the trait MyServiceBusSettings each time connection has to be established...
-
+## Settings
+Implement `MyServiceBusSettings` to supply the host/port:
 ```rust
-
-
 #[derive(my_settings_reader::SettingsModel, Serialize, Deserialize, Debug, Clone)]
 pub struct SettingsModel {
-    ....
-
     #[serde(rename = "MySb")]
     pub my_sb: String,
 }
@@ -30,102 +22,62 @@ impl MyServiceBusSettings for SettingsReader {
         read_access.my_sb.clone()
     }
 }
-
-
 ```
 
-
-Code Example - how to publish messages:
-
+## Client creation
 ```rust
-use std::time::Duration;
-use my_service_bus_tcp_client::MyServiceBusClient;
-
-#[tokio::main]
-async fn main() {
-
-    let client = TcpClient::new(
-        "test-app".to_string(),
-        "127.0.0.1:6421".to_string(),
-    );
-    
-    my_sb_connection.start().await;
-    
-    
-    let data_to_publish = vec![MessageToPublish {
-                                content: // Put payload of content here,
-                                headers: // Put headers here,
-                             }];
-
-    let result = app_ctx
-            .my_sb_connection
-            .publish_chunk("topic_name".to_string(), data_to_publish)
-            .await;
-
-    if let Err(err) = error {
-       println!("Publish error: {:?}", err);
-    }
-            
-}
+let client = MyServiceBusClient::new(
+    "app-name",
+    "app-version",
+    settings_reader,          // Arc<dyn MyServiceBusSettings>
+    logger_arc,
+);
+client.start().await;        // establish TCP connection and keep it alive
 ```
 
-Code Example - how to subscribe and receive messages:
+## Publishers
+- `get_publisher(do_retries: bool)` returns `MyServiceBusPublisher<T>`.
+- The topic is created if missing (SDK sends `CreateTopicIfNotExists` during connection).
+- `do_retries = true` makes publish loop until connection is restored when errors are `NoConnectionToPublish`/`Disconnected`; `false` returns the error immediately.
+- Serialization errors are not retried.
 
+Example:
 ```rust
-use async_trait::async_trait;
-use my_service_bus_shared::queue::TopicQueueType;
-use my_service_bus_tcp_client::{
-    subscribers::{MessagesReader, SubscriberCallback},
-    MyServiceBusClient,
-};
-use std::{sync::Arc, time::Duration};
+let publisher = client.get_publisher::<MyContract>(true).await;
+publisher.publish(&msg, None).await?;
+```
 
-#[tokio::main]
-async fn main() {
+## Subscribers
+```rust
+client
+    .subscribe::<MyContract>(
+        "queue-id",
+        TopicQueueType::DeleteOnDisconnect, // or PermanentWithSingleConnection, etc.
+        Arc::new(MySubscriber {}),
+    )
+    .await;
 
-    let client = TcpClient::new(
-        "test-app".to_string(),
-        "127.0.0.1:6421".to_string(),
-    );
-
-    my_sb_connection
-        .subscribe(
-            settings.topic_name.to_string(),
-            "test-queue".to_string(),
-            TopicQueueType::DeleteOnDisconnect,
-            Arc::new(MySbSubscriber {}),
-        )
-        .await;
-
-    my_sb_connection.start().await;
-
-    loop {
-        tokio::time::sleep(Duration::from_secs(3)).await;
-    }
-            
-}
-
-
-pub struct MySbSubscriber {}
-
-#[async_trait]
-impl SubscriberCallback for MySbSubscriber {
-    async fn new_events(&self, mut messages_reader: MessagesReader) {
+#[async_trait::async_trait]
+impl SubscriberCallback<MyContract> for MySubscriber {
+    async fn new_events(&self, mut messages_reader: MessagesReader<MyContract>) {
         for msg in messages_reader.get_messages() {
-            println!("{:?}", msg.headers);
+            // handle message
             messages_reader.handled_ok(&msg);
         }
     }
 }
 ```
 
-
-### How to Ignore Message
-
-There are situation when message can not be delivered and has to be ignore.
-
-Please Set environment variable on subscriber application
-```env
-SB_IGNORE_MESSAGE:  TOPIC_ID=xxx;QUEUE_ID=xxx;MESSAGE_ID=xxx
+## Ignore specific message
+Set env var to skip delivery for a specific message:
+```
+SB_IGNORE_MESSAGE=TOPIC_ID=xxx;QUEUE_ID=xxx;MESSAGE_ID=xxx
 ```
 
+## Operational notes
+- Reconnect loop sleeps 1s while waiting for connection.
+- Consider idempotent handlers; publisher retries can duplicate sends on reconnect.
+- `TopicQueueType` recap:
+  - `DeleteOnDisconnect`: ephemeral queue removed after a timeout on disconnect (short reconnects—e.g., within ~20s—keep the queue intact).
+  - `Permanent`: durable queue persists.
+  - `PermanentWithSingleConnection`: durable queue, and a new connection will drop the previous one.

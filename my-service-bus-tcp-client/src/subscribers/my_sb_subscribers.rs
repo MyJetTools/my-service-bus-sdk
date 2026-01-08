@@ -137,7 +137,7 @@ impl MyServiceBusSubscriberClient for MySbSubscribers {
         queue_id: &str,
         confirmation_id: i64,
         connection_id: i32,
-        delivered: Vec<my_service_bus_abstractions::queue_with_intervals::QueueIndexRange>,
+        delivered: Vec<my_service_bus_abstractions::queue_with_intervals::QueueIndexRange<i64>>,
     ) {
         let tcp_contract = MySbTcpContract::ConfirmSomeMessagesAsOk {
             topic_id: topic_id.to_string(),
@@ -156,7 +156,7 @@ impl MyServiceBusSubscriberClient for MySbSubscribers {
         queue_id: &str,
         confirmation_id: i64,
         connection_id: i32,
-        delivered: Vec<my_service_bus_abstractions::queue_with_intervals::QueueIndexRange>,
+        delivered: Vec<my_service_bus_abstractions::queue_with_intervals::QueueIndexRange<i64>>,
     ) {
         let tcp_contract = MySbTcpContract::IntermediaryConfirm {
             packet_version: 0,

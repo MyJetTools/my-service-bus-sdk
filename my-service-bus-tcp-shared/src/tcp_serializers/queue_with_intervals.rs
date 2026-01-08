@@ -4,7 +4,7 @@ use my_tcp_sockets::{
     TcpWriteBuffer,
 };
 
-pub fn serialize(write_buffer: &mut impl TcpWriteBuffer, value: &Vec<QueueIndexRange>) {
+pub fn serialize(write_buffer: &mut impl TcpWriteBuffer, value: &Vec<QueueIndexRange<i64>>) {
     write_buffer.write_i32(value.len() as i32);
     //super::i32::serialize(payload, value.len() as i32);
 
@@ -18,10 +18,10 @@ pub fn serialize(write_buffer: &mut impl TcpWriteBuffer, value: &Vec<QueueIndexR
 
 pub async fn deserialize<T: SocketReader + Send + Sync + 'static>(
     reader: &mut T,
-) -> Result<Vec<QueueIndexRange>, ReadingTcpContractFail> {
+) -> Result<Vec<QueueIndexRange<i64>>, ReadingTcpContractFail> {
     let len = reader.read_i32().await?;
 
-    let mut result: Vec<QueueIndexRange> = Vec::new();
+    let mut result: Vec<QueueIndexRange<i64>> = Vec::new();
 
     for _ in 0..len {
         let from_id = reader.read_i64().await?;

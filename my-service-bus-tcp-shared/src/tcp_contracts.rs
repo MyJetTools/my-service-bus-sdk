@@ -63,7 +63,7 @@ pub enum MySbTcpContract {
         topic_id: String,
         queue_id: String,
         confirmation_id: ConfirmationId,
-        delivered: Vec<QueueIndexRange>,
+        delivered: Vec<QueueIndexRange<i64>>,
     },
     PacketVersions {
         packet_versions: HashMap<u8, i32>,
@@ -82,7 +82,7 @@ pub enum MySbTcpContract {
         topic_id: String,
         queue_id: String,
         confirmation_id: ConfirmationId,
-        delivered: Vec<QueueIndexRange>,
+        delivered: Vec<QueueIndexRange<i64>>,
     },
 }
 
