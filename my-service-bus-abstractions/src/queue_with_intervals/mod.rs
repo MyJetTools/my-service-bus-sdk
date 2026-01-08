@@ -11,7 +11,8 @@ mod index_to_insert_value;
 pub use index_to_insert_value::*;
 mod index_to_remove_value;
 pub use index_to_remove_value::*;
-mod index_to_remove_range;
-pub use index_to_remove_range::*;
+mod remove_range;
+pub use remove_range::*;
 mod enqueue_range;
+#[allow(unused_imports)]
 pub use enqueue_range::*;

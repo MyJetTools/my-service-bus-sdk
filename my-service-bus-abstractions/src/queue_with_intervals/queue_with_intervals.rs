@@ -116,11 +116,7 @@ impl QueueWithIntervals {
         Ok(())
     }
 
-    pub fn remove_range(&mut self, range_to_remove: QueueIndexRange) {
-        todo!("todo")
-    }
-
-    fn remove_interval(&mut self, index: usize) {
+    pub(crate) fn remove_interval(&mut self, index: usize) {
         if self.intervals.len() > 1 {
             self.intervals.remove(index);
             return;
@@ -303,6 +299,34 @@ mod tests {
 
         assert_eq!(true, queue.get_min_id().is_none());
         assert_eq!(0, queue.queue_size());
+    }
+
+    #[test]
+    fn restore_sorts_and_handles_empty_input() {
+        let queue = QueueWithIntervals::restore(vec![
+            QueueIndexRange::restore(30, 40),
+            QueueIndexRange::restore(10, 20),
+            QueueIndexRange::restore(25, 27),
+        ]);
+
+        assert_eq!(3, queue.intervals.len());
+        assert_eq!(
+            (10, 20),
+            (queue.intervals[0].from_id, queue.intervals[0].to_id)
+        );
+        assert_eq!(
+            (25, 27),
+            (queue.intervals[1].from_id, queue.intervals[1].to_id)
+        );
+        assert_eq!(
+            (30, 40),
+            (queue.intervals[2].from_id, queue.intervals[2].to_id)
+        );
+
+        let empty_restored = QueueWithIntervals::restore(vec![]);
+        assert!(empty_restored.is_empty());
+        assert_eq!(1, empty_restored.intervals.len());
+        assert!(empty_restored.intervals[0].is_empty());
     }
 
     #[test]
@@ -581,6 +605,175 @@ mod tests {
 
         assert_eq!(502, queue.intervals.get(0).unwrap().from_id);
         assert_eq!(507, queue.intervals.get(0).unwrap().to_id);
+    }
+
+    #[test]
+    fn peek_min_max_on_empty_and_after_operations() {
+        let mut queue = QueueWithIntervals::new();
+
+        assert_eq!(None, queue.peek());
+        assert_eq!(None, queue.get_min_id());
+        assert_eq!(None, queue.get_max_id());
+
+        queue.enqueue(11);
+        queue.enqueue(12);
+
+        assert_eq!(Some(11), queue.peek());
+        assert_eq!(Some(11), queue.get_min_id());
+        assert_eq!(Some(12), queue.get_max_id());
+
+        queue.dequeue();
+        queue.dequeue();
+
+        assert_eq!(None, queue.peek());
+        assert_eq!(None, queue.get_min_id());
+        assert_eq!(None, queue.get_max_id());
+    }
+
+    #[test]
+    fn has_message_and_lengths_match() {
+        let mut queue = QueueWithIntervals::new();
+
+        queue.enqueue(30);
+        queue.enqueue(31);
+        queue.enqueue(33);
+
+        assert!(queue.has_message(30));
+        assert!(!queue.has_message(29));
+        assert!(!queue.has_message(32));
+        assert_eq!(3, queue.queue_size());
+        assert_eq!(3, queue.len());
+
+        queue.remove(31).unwrap();
+
+        assert_eq!(2, queue.queue_size());
+        assert_eq!(2, queue.len());
+        assert!(!queue.has_message(31));
+    }
+
+    #[test]
+    fn enqueue_existing_value_does_not_change_state() {
+        let mut queue = QueueWithIntervals::new();
+
+        queue.enqueue(5);
+        queue.enqueue(6);
+        queue.enqueue(6);
+
+        assert_eq!(1, queue.intervals.len());
+        assert_eq!(5, queue.intervals.get(0).unwrap().from_id);
+        assert_eq!(6, queue.intervals.get(0).unwrap().to_id);
+        assert_eq!(2, queue.queue_size());
+    }
+
+    #[test]
+    fn merge_combines_and_merges_adjacent_intervals() {
+        let mut base = QueueWithIntervals::new();
+        base.enqueue(1);
+        base.enqueue(2);
+        base.enqueue(10);
+        base.enqueue(11);
+        base.enqueue(12);
+
+        let mut other = QueueWithIntervals::new();
+        other.enqueue(3);
+        other.enqueue(4);
+        other.enqueue(8);
+        other.enqueue(9);
+        other.enqueue(13);
+
+        base.merge(other);
+
+        assert_eq!(2, base.intervals.len());
+        assert_eq!(1, base.intervals[0].from_id);
+        assert_eq!(4, base.intervals[0].to_id);
+        assert_eq!(8, base.intervals[1].from_id);
+        assert_eq!(13, base.intervals[1].to_id);
+    }
+
+    #[test]
+    fn reset_and_clean_behaviour() {
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue(5);
+        queue.enqueue(6);
+        queue.enqueue(10);
+
+        let last_to_id = queue.get_max_id().unwrap();
+        queue.clean();
+
+        assert_eq!(1, queue.intervals.len());
+        let first = queue.intervals.first().unwrap();
+        assert!(first.is_empty());
+        assert_eq!(last_to_id, first.to_id);
+
+        queue.reset(vec![]);
+        assert_eq!(1, queue.intervals.len());
+        assert!(queue.is_empty());
+    }
+
+    #[test]
+    fn snapshot_is_copy() {
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue(100);
+        queue.enqueue(101);
+
+        let mut snapshot = queue.get_snapshot();
+        snapshot[0].from_id = 999;
+
+        assert_eq!(Some(100), queue.get_min_id());
+        assert_eq!(Some(101), queue.get_max_id());
+    }
+
+    #[test]
+    fn dequeue_until_empty_then_none() {
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue(42);
+
+        assert_eq!(Some(42), queue.dequeue());
+        assert_eq!(None, queue.dequeue());
+        assert!(queue.is_empty());
+    }
+
+    #[test]
+    fn remove_errors_are_returned() {
+        let mut queue = QueueWithIntervals::new();
+        assert!(matches!(
+            queue.remove(5).unwrap_err(),
+            QueueWithIntervalsError::QueueIsEmpty
+        ));
+
+        queue.enqueue(1);
+        assert!(matches!(
+            queue.remove(2).unwrap_err(),
+            QueueWithIntervalsError::MessagesNotFound
+        ));
+    }
+
+    #[test]
+    fn borrowed_iterator_keeps_original_intact() {
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue(7);
+        queue.enqueue(8);
+        queue.enqueue(9);
+
+        let collected: Vec<i64> = (&queue).into_iter().collect();
+        assert_eq!(vec![7, 8, 9], collected);
+        assert_eq!(Some(7), queue.peek());
+        assert_eq!(3, queue.queue_size());
+    }
+
+    #[test]
+    fn iterator_spans_multiple_intervals() {
+        let mut queue = QueueWithIntervals::new();
+        queue.enqueue(1);
+        queue.enqueue(2);
+        queue.enqueue(5);
+        queue.enqueue(6);
+
+        let collected: Vec<i64> = queue.iter().collect();
+        assert_eq!(vec![1, 2, 5, 6], collected);
+
+        assert_eq!(Some(1), queue.peek());
+        assert_eq!(4, queue.queue_size());
     }
 
     #[test]
