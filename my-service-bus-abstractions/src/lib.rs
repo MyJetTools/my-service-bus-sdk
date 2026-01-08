@@ -3,7 +3,7 @@ mod errors;
 mod message_id;
 mod my_sb_message;
 pub mod publisher;
-pub mod queue_with_intervals;
+
 pub mod subscriber;
 pub use abstractions::*;
 pub use errors::*;
@@ -13,3 +13,5 @@ mod message_headers;
 pub use message_headers::*;
 mod serializer;
 pub use serializer::*;
+
+pub extern crate queue_with_intervals;

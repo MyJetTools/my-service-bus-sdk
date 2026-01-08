@@ -36,7 +36,7 @@ pub trait MyServiceBusSubscriberClient {
         queue_id: &str,
         confirmation_id: i64,
         connection_id: i32,
-        ok_messages: Vec<crate::queue_with_intervals::QueueIndexRange>,
+        ok_messages: Vec<crate::queue_with_intervals::QueueIndexRange<i64>>,
     );
 
     fn intermediary_confirm(
@@ -45,7 +45,7 @@ pub trait MyServiceBusSubscriberClient {
         queue_id: &str,
         confirmation_id: i64,
         connection_id: i32,
-        ok_messages: Vec<crate::queue_with_intervals::QueueIndexRange>,
+        ok_messages: Vec<crate::queue_with_intervals::QueueIndexRange<i64>>,
     );
 }
 
