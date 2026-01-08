@@ -8,10 +8,11 @@ edition = "2021"
 default = []
 tcp-client = []
 
+
 [dependencies]
 my-service-bus-abstractions = { path = "../my-service-bus-abstractions" }
 my-service-bus-shared = { path = "../my-service-bus-shared" }
-my-tcp-sockets = { tag = "0.1.11", git = "https://github.com/MyJetTools/my-tcp-sockets.git" }
+my-tcp-sockets = { tag = "0.1.12", git = "https://github.com/MyJetTools/my-tcp-sockets.git" }
 rust-extensions = { tag = "0.1.5", git = "https://github.com/MyJetTools/rust-extensions.git" }
 
 tokio = { version = "*", features = ["full"] }
