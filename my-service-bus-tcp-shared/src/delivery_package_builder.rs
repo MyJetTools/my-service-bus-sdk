@@ -29,6 +29,18 @@ impl DeliverTcpPacketBuilder {
         }
     }
 
+    pub fn new_last_version(topic_id: &str, queue_id: &str, subscriber_id: i64) -> Self {
+        Self::new(
+            topic_id,
+            queue_id,
+            subscriber_id,
+            PacketProtVer {
+                packet_version: 0,
+                tcp_protocol_version: Default::default(),
+            },
+        )
+    }
+
     pub fn append_packet(&mut self, msg: &impl MyServiceBusMessage) {
         crate::tcp_serializers::messages_to_deliver::serialize(
             &mut self.payload,

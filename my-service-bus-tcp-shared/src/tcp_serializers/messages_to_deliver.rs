@@ -4,6 +4,8 @@ use my_tcp_sockets::socket_reader::{ReadingTcpContractFail, SocketReader};
 
 use crate::PacketProtVer;
 
+pub const MESSAGE_LAST_VERSION: u8 = 3;
+
 pub fn serialize(dest: &mut Vec<u8>, msg: &impl MyServiceBusMessage, version: &PacketProtVer) {
     if version.tcp_protocol_version.get_value() < 3 {
         serialize_v2(dest, msg, version.packet_version);
