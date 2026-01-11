@@ -1,3 +1,5 @@
+use std::io::Cursor;
+
 use my_service_bus_abstractions::{MySbMessage, MyServiceBusMessage, SbMessageHeaders};
 
 use my_tcp_sockets::socket_reader::{ReadingTcpContractFail, SocketReader};
@@ -75,6 +77,60 @@ pub async fn deserialize_v3<TSocketReader: SocketReader + Send + Sync + 'static>
     let headers = crate::tcp_serializers::message_headers::deserialize(socket_reader).await?;
 
     let content = socket_reader.read_byte_array().await?;
+
+    let result = MySbMessage {
+        id: id.into(),
+        headers,
+        attempt_no,
+        content,
+    };
+
+    Ok(result)
+}
+
+pub fn read_from_mem(
+    reader: &mut Cursor<&[u8]>,
+    version: &PacketProtVer,
+) -> Result<MySbMessage, ReadingTcpContractFail> {
+    if version.tcp_protocol_version.get_value() < 3 {
+        return read_from_mem_v2(reader, version.packet_version);
+    }
+
+    return read_from_mem_v3(reader);
+}
+
+pub fn read_from_mem_v2(
+    reader: &mut Cursor<&[u8]>,
+    packet_version: u8,
+) -> Result<MySbMessage, ReadingTcpContractFail> {
+    let id = super::i64::read_from_mem(reader)?;
+
+    let attempt_no = if packet_version == 1 {
+        super::i32::read_from_mem(reader)?
+    } else {
+        0
+    };
+
+    let content = super::byte_array::read_from_mem(reader)?;
+
+    let result = MySbMessage {
+        id: id.into(),
+        headers: SbMessageHeaders::new(),
+        attempt_no,
+        content,
+    };
+
+    Ok(result)
+}
+
+pub fn read_from_mem_v3(reader: &mut Cursor<&[u8]>) -> Result<MySbMessage, ReadingTcpContractFail> {
+    let id = super::i64::read_from_mem(reader)?;
+
+    let attempt_no = super::i32::read_from_mem(reader)?;
+
+    let headers = crate::tcp_serializers::message_headers::read_from_mem(reader)?;
+
+    let content = super::byte_array::read_from_mem(reader)?;
 
     let result = MySbMessage {
         id: id.into(),

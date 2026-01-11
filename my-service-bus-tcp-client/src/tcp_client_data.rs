@@ -52,24 +52,25 @@ impl my_tcp_sockets::SocketEventCallback<MySbTcpContract, MySbTcpSerializer, MyS
             my_service_bus_tcp_shared::MySbTcpContract::PublishResponse { request_id } => {
                 self.publishers.set_confirmed(request_id).await;
             }
-            my_service_bus_tcp_shared::MySbTcpContract::NewMessages {
-                topic_id,
-                queue_id,
-                confirmation_id,
-                mut messages,
-            } => {
+            my_service_bus_tcp_shared::MySbTcpContract::NewMessages(mut model) => {
                 if let Some(auto_confirm_message) = self.ignore_message.as_ref() {
-                    if auto_confirm_message.topic_id == topic_id
-                        && auto_confirm_message.queue_id == queue_id
+                    if auto_confirm_message.topic_id == model.topic_id
+                        && auto_confirm_message.queue_id == model.queue_id
                     {
-                        messages.retain(|itm| {
+                        model.messages.retain(|itm| {
                             itm.id.get_value() != auto_confirm_message.message_id.get_value()
                         });
                     }
                 }
 
                 self.subscribers
-                    .new_messages(topic_id, queue_id, confirmation_id, connection.id, messages)
+                    .new_messages(
+                        model.topic_id,
+                        model.queue_id,
+                        model.confirmation_id,
+                        connection.id,
+                        model.messages,
+                    )
                     .await
             }
             _ => {}

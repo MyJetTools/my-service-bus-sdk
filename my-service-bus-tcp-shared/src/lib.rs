@@ -1,10 +1,12 @@
-pub mod delivery_package_builder;
+pub mod new_messages_packet_builder;
 pub mod tcp_contract_to_string;
 pub mod tcp_message_id;
 pub mod tcp_serializers;
 
 mod my_sb_serializer_metadata;
+mod new_messages_model;
 mod packet_versions;
+pub use new_messages_model::*;
 
 mod tcp_contracts;
 mod tcp_serializer;

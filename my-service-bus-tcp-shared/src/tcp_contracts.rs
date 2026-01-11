@@ -1,13 +1,13 @@
 use my_service_bus_abstractions::{
     publisher::MessageToPublish, queue_with_intervals::QueueIndexRange, subscriber::TopicQueueType,
-    MySbMessage, SbMessageHeaders,
+    SbMessageHeaders,
 };
 use my_tcp_sockets::{
     socket_reader::{ReadingTcpContractFail, SocketReader},
     TcpWriteBuffer,
 };
 
-use crate::MySbSerializerState;
+use crate::{MySbSerializerState, NewMessagesModel};
 
 use super::tcp_message_id::*;
 
@@ -44,12 +44,7 @@ pub enum MySbTcpContract {
         queue_id: String,
     },
     Raw(Vec<u8>),
-    NewMessages {
-        topic_id: String,
-        queue_id: String,
-        confirmation_id: i64,
-        messages: Vec<MySbMessage>,
-    },
+    NewMessages(NewMessagesModel),
     NewMessagesConfirmation {
         topic_id: String,
         queue_id: String,
@@ -196,12 +191,12 @@ impl MySbTcpContract {
                     messages.push(msg);
                 }
 
-                let result = MySbTcpContract::NewMessages {
+                let result = MySbTcpContract::NewMessages(NewMessagesModel {
                     topic_id,
                     queue_id,
                     confirmation_id,
                     messages,
-                };
+                });
 
                 Ok(result)
             }
@@ -391,12 +386,7 @@ impl MySbTcpContract {
             MySbTcpContract::Raw(payload) => {
                 write_buffer.write_slice(payload);
             }
-            MySbTcpContract::NewMessages {
-                topic_id: _,
-                queue_id: _,
-                confirmation_id: _,
-                messages: _,
-            } => {
+            MySbTcpContract::NewMessages(_) => {
                 panic!(
                     "This packet is not used by server. Server uses optimized version of the packet"
                 );
@@ -542,6 +532,21 @@ impl MySbTcpContract {
 
         write_buffer.write_bool(persist_immediately);
         //crate::tcp_serializers::bool::serialize(&mut result, persist_immediately);
+    }
+
+    pub fn unwrap_as_message(
+        self,
+        packet_version: crate::PacketProtVer,
+    ) -> Result<NewMessagesModel, my_tcp_sockets::socket_reader::ReadingTcpContractFail> {
+        match self {
+            MySbTcpContract::Raw(payload) => {
+                NewMessagesModel::deserialize(payload.as_slice(), &packet_version)
+            }
+            MySbTcpContract::NewMessages(model) => Ok(model),
+            _ => {
+                panic!("Invalid packet type: {}", self.as_str());
+            }
+        }
     }
 }
 
