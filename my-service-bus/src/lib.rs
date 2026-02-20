@@ -13,6 +13,6 @@ pub extern crate my_service_bus_shared as shared;
 pub extern crate my_service_bus_macros as macros;
 
 pub mod prelude {
-    pub use my_service_bus_abstractions::publisher::MyServiceBusPublisher;
-    pub use my_service_bus_abstractions::subscriber::MessagesReader;
+    pub use abstractions::subscriber::*;
+    pub use my_service_bus_abstractions::publisher::*;
 }
