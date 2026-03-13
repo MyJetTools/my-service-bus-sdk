@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use queue_with_intervals::QueueWithIntervals;
+
 use tokio::sync::Mutex;
 
 use crate::{MessageId, SbMessageHeaders};

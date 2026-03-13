@@ -201,7 +201,7 @@ async fn callback_new_messages<
             );
             reader.data.logger.write_fatal_error(
                 "new_events".to_string(),
-                format!("Can not handle messages. Err: {}", err.msg),
+                format!("Can not handle messages. Err: {:?}", err),
                 Some(ctx),
             );
         }

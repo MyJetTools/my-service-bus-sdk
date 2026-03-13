@@ -1,7 +1,9 @@
 use super::{MessagesReader, MySbMessageDeserializer};
 
-pub struct MySbSubscriberHandleError {
-    pub msg: String,
+#[derive(Debug)]
+pub enum MySbSubscriberHandleError {
+    AllMessagesAreNotDelivered,
+    Other(String),
 }
 
 #[async_trait::async_trait]
