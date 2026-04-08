@@ -36,15 +36,31 @@ client.start().await;        // establish TCP connection and keep it alive
 ```
 
 ## Publishers
+
+The SDK provides two publisher types for different use-cases:
+
+### `MyServiceBusPublisher` – synchronous publish
 - `get_publisher(do_retries: bool)` returns `MyServiceBusPublisher<T>`.
-- The topic is created if missing (SDK sends `CreateTopicIfNotExists` during connection).
+- Each `publish()` / `publish_messages()` call sends directly over the network and **awaits confirmation** before returning. The caller knows the result immediately.
 - `do_retries = true` makes publish loop until connection is restored when errors are `NoConnectionToPublish`/`Disconnected`; `false` returns the error immediately.
 - Serialization errors are not retried.
+- The topic is created if missing (SDK sends `CreateTopicIfNotExists` during connection).
 
-Example:
 ```rust
 let publisher = client.get_publisher::<MyContract>(true).await;
 publisher.publish(&msg, None).await?;
+```
+
+### `PublisherWithInternalQueue` – fire-and-forget with batching
+- Messages are placed into an **internal queue** and the call returns immediately.
+- A background task drains the queue in batches (up to 4 MB), sends each batch over the network, and waits for server confirmation (send-confirm pattern).
+- While the current batch is in flight, **new messages continue to accumulate** in the queue without blocking the caller.
+- On publish failure the batch is retried after a 3-second delay; the queue keeps accepting new messages during this time.
+
+```rust
+let publisher = PublisherWithInternalQueue::<MyContract>::new(topic_id, client, logger);
+publisher.publish_and_forget(msg).await?;       // single message
+publisher.publish_chunk_and_forget(msgs).await?; // batch
 ```
 
 ## Subscribers
