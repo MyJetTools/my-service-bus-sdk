@@ -42,7 +42,7 @@ impl TcpClientSocketSettings for TcpConnectionSettings {
 
 pub struct MyServiceBusClient {
     pub tcp_client: TcpClient,
-    data: Arc<TcpClientData>,
+    data: TcpClientData,
 }
 
 impl MyServiceBusClient {
@@ -67,7 +67,7 @@ impl MyServiceBusClient {
 
         Self {
             tcp_client: TcpClient::new(TCP_CLIENT_NAME.to_string(), Arc::new(tcp_settings)),
-            data: Arc::new(data),
+            data,
         }
     }
 

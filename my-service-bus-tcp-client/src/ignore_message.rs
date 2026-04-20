@@ -1,5 +1,6 @@
 use my_service_bus_abstractions::MessageId;
 
+#[derive(Clone)]
 pub struct IgnoreMessage {
     pub topic_id: String,
     pub queue_id: String,
