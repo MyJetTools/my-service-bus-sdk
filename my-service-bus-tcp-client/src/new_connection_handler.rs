@@ -5,7 +5,7 @@ use my_service_bus_tcp_shared::{
 };
 use my_tcp_sockets::tcp_connection::TcpSocketConnection;
 
-pub async fn send_greeting(
+pub fn send_greeting(
     socket_ctx: &TcpSocketConnection<MySbTcpContract, MySbTcpSerializer, MySbSerializerState>,
     app_name: &str,
     app_version: &str,
@@ -23,10 +23,10 @@ pub async fn send_greeting(
         protocol_version: DEFAULT_TCP_PROTOCOL_VERSION,
     };
 
-    socket_ctx.send(&greeting).await;
+    socket_ctx.send(&greeting);
 }
 
-pub async fn send_packet_versions(
+pub fn send_packet_versions(
     socket_ctx: &TcpSocketConnection<MySbTcpContract, MySbTcpSerializer, MySbSerializerState>,
 ) {
     let mut packet_versions = HashMap::new();
@@ -34,5 +34,5 @@ pub async fn send_packet_versions(
 
     let packet_versions = MySbTcpContract::PacketVersions { packet_versions };
 
-    socket_ctx.send(&packet_versions).await;
+    socket_ctx.send(&packet_versions);
 }

@@ -59,7 +59,7 @@ impl MySbPublisherData {
     ) -> TaskCompletionAwaiter<(), PublishError> {
         let connection = self.connection.as_mut().unwrap();
 
-        connection.socket.send(tcp_contract).await;
+        connection.socket.send(tcp_contract);
 
         let mut task = TaskCompletion::new();
         let awaiter = task.get_awaiter();

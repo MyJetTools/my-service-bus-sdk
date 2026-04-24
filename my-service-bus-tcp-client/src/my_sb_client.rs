@@ -138,8 +138,7 @@ impl MyServiceBusClient {
         let subscriber = Arc::new(subscriber);
         self.data
             .subscribers
-            .add(topic_id, queue_id.to_string(), subscriber)
-            .await;
+            .add(topic_id, queue_id.to_string(), subscriber);
     }
 
     pub fn has_connection(&self) -> bool {

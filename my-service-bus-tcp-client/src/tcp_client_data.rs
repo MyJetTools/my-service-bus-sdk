@@ -29,13 +29,12 @@ impl my_tcp_sockets::SocketEventCallback<MySbTcpContract, MySbTcpSerializer, MyS
             self.app_name.as_str(),
             self.app_version.as_str(),
             self.client_version.as_str(),
-        )
-        .await;
+        );
 
-        super::new_connection_handler::send_packet_versions(&connection).await;
+        super::new_connection_handler::send_packet_versions(&connection);
 
         self.publishers.new_connection(connection.clone()).await;
-        self.subscribers.new_connection(connection.clone()).await;
+        self.subscribers.new_connection(connection.clone());
 
         self.has_connection
             .store(true, std::sync::atomic::Ordering::SeqCst);
@@ -45,7 +44,7 @@ impl my_tcp_sockets::SocketEventCallback<MySbTcpContract, MySbTcpSerializer, MyS
         self.has_connection
             .store(false, std::sync::atomic::Ordering::SeqCst);
         self.publishers.disconnect().await;
-        self.subscribers.disconnect().await;
+        self.subscribers.disconnect();
     }
 
     async fn payload(&mut self, connection: &Arc<MySbTcpConnection>, contract: MySbTcpContract) {
@@ -71,8 +70,7 @@ impl my_tcp_sockets::SocketEventCallback<MySbTcpContract, MySbTcpSerializer, MyS
                         model.confirmation_id,
                         connection.id,
                         model.messages,
-                    )
-                    .await
+                    );
             }
             _ => {}
         }

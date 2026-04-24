@@ -33,7 +33,7 @@ impl MySbPublishers {
 
         for topic_id in self.get_topics_to_create().await {
             let packet = MySbTcpContract::CreateTopicIfNotExists { topic_id };
-            connection.send(&packet).await;
+            connection.send(&packet);
         }
     }
 
