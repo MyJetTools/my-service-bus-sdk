@@ -79,6 +79,13 @@ impl MySbSubscribers {
                 queue_type: subscriber.get_queue_type(),
             };
 
+            println!(
+                "Sending Subscribe packet: topic_id={}, queue_id={}, queue_type={:?}",
+                subscriber.get_topic_id(),
+                subscriber.get_queue_id(),
+                subscriber.get_queue_type()
+            );
+
             connection.send(&packet).await;
         }
     }

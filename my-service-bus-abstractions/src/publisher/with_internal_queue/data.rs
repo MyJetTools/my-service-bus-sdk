@@ -1,8 +1,9 @@
 use std::{collections::HashMap, sync::Arc};
 
+use parking_lot::Mutex;
 use rust_extensions::auto_shrink::VecDequeAutoShrink;
 
-use tokio::sync::Mutex;
+
 
 use crate::MyServiceBusPublisherClient;
 
@@ -31,8 +32,8 @@ pub struct PublisherWithInternalQueueData {
 }
 
 impl PublisherWithInternalQueueData {
-    pub async fn get_messages_to_publish(&self) -> Option<Vec<MessageToPublish>> {
-        let mut write_access = self.queue_to_publish.lock().await;
+    pub fn get_messages_to_publish(&self) -> Option<Vec<MessageToPublish>> {
+        let mut write_access = self.queue_to_publish.lock();
         if write_access.queue.len() == 0 {
             return None;
         }
@@ -54,16 +55,15 @@ impl PublisherWithInternalQueueData {
         Some(result)
     }
 
-    pub async fn messages_are_published(&self) {
-        let mut write_access = self.queue_to_publish.lock().await;
+    pub fn messages_are_published(&self) {
+        let mut write_access = self.queue_to_publish.lock();
         write_access.being_published = 0;
     }
 
     pub async fn publish(&self, to_publish: &[MessageToPublish]) -> bool {
         let result = self
             .client
-            .publish_messages(&self.topic_id, &to_publish, true)
-            .await;
+            .publish_messages(&self.topic_id, &to_publish, true).await;
 
         match result {
             Ok(_) => return true,

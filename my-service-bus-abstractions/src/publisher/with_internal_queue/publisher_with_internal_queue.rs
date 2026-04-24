@@ -3,9 +3,9 @@ use std::{collections::HashMap, sync::Arc};
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::MyTelemetryContext;
 
+use parking_lot::Mutex;
 use tokio::sync::{
     mpsc::{UnboundedReceiver, UnboundedSender},
-    Mutex,
 };
 
 use crate::{MySbMessageSerializer, MyServiceBusPublisherClient, PublishError};
@@ -67,10 +67,12 @@ impl<TMessageModel: MySbMessageSerializer> PublisherWithInternalQueue<TMessageMo
             super::super::my_telemetry::apply_publish_telemetry(&mut headers, my_telemetry)
         }
 
-        let mut write_access = self.data.queue_to_publish.lock().await;
+        let mut write_access = self.data.queue_to_publish.lock();
         write_access
             .queue
             .push_back(MessageToPublish { headers, content });
+
+        drop(write_access);
 
         if let Err(err) = self.event_sender.send(()) {
             let mut ctx = HashMap::new();
@@ -114,10 +116,12 @@ impl<TMessageModel: MySbMessageSerializer> PublisherWithInternalQueue<TMessageMo
             to_publish.push(msg_to_publish);
         }
 
-        let mut write_access = self.data.queue_to_publish.lock().await;
+        let mut write_access = self.data.queue_to_publish.lock();
         for msg in to_publish {
             write_access.queue.push_back(msg);
         }
+
+        drop(write_access);
 
         if let Err(err) = self.event_sender.send(()) {
             let mut ctx = HashMap::new();
@@ -131,8 +135,8 @@ impl<TMessageModel: MySbMessageSerializer> PublisherWithInternalQueue<TMessageMo
 
         Ok(())
     }
-    pub async fn get_queue_size(&self) -> usize {
-        let read_access = self.data.queue_to_publish.lock().await;
+    pub fn get_queue_size(&self) -> usize {
+        let read_access = self.data.queue_to_publish.lock();
         read_access.queue.len() + read_access.being_published
     }
 }
@@ -145,7 +149,7 @@ async fn events_publisher(
     loop {
         if to_publish.is_none() {
             tokio::sync::mpsc::UnboundedReceiver::recv(&mut event_receiver).await;
-            to_publish = data.get_messages_to_publish().await;
+            to_publish = data.get_messages_to_publish();
         }
 
         if to_publish.is_none() {
@@ -153,7 +157,7 @@ async fn events_publisher(
         }
 
         if data.publish(to_publish.as_ref().unwrap()).await {
-            data.messages_are_published().await;
+            data.messages_are_published();
             to_publish = None;
         } else {
             tokio::time::sleep(std::time::Duration::from_secs(3)).await;
