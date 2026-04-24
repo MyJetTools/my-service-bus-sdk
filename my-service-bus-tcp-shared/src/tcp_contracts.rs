@@ -551,6 +551,14 @@ impl MySbTcpContract {
 }
 
 impl my_tcp_sockets::TcpContract for MySbTcpContract {
+    fn is_ping(&self) -> bool {
+        if let MySbTcpContract::Ping = self {
+            return true;
+        }
+
+        false
+    }
+
     fn is_pong(&self) -> bool {
         if let MySbTcpContract::Pong = self {
             return true;
