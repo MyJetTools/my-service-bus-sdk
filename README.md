@@ -52,14 +52,14 @@ publisher.publish(&msg, None).await?;
 ```
 
 ### `PublisherWithInternalQueue` – fire-and-forget with batching
-- Messages are placed into an **internal queue** and the call returns immediately.
-- A background task drains the queue in batches (up to 4 MB), sends each batch over the network, and waits for server confirmation (send-confirm pattern).
-- While the current batch is in flight, **new messages continue to accumulate** in the queue without blocking the caller.
-- On publish failure the batch is retried after a 3-second delay; the queue keeps accepting new messages during this time.
+- `client.get_publisher_with_internal_queue::<T>().await` returns `PublisherWithInternalQueue<T>`.
+- `publish_and_forget` / `publish_chunk_and_forget` return immediately after enqueue — the actual send happens in the background.
+- Use it when you don't need the publish result synchronously and want to avoid awaiting the network round-trip on the hot path.
+- Errors returned from these methods are **serialization errors only**; transport failures are retried in the background.
 
 ```rust
-let publisher = PublisherWithInternalQueue::<MyContract>::new(topic_id, client, logger);
-publisher.publish_and_forget(msg).await?;       // single message
+let publisher = client.get_publisher_with_internal_queue::<MyContract>().await;
+publisher.publish_and_forget(msg).await?;        // single message
 publisher.publish_chunk_and_forget(msgs).await?; // batch
 ```
 

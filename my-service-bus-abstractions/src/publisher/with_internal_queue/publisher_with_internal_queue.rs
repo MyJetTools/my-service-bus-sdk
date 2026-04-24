@@ -45,7 +45,7 @@ impl<TMessageModel: MySbMessageSerializer> PublisherWithInternalQueue<TMessageMo
         result
     }
 
-    pub async fn publish_and_forget(
+    pub fn publish_and_forget(
         &self,
         message: TMessageModel,
         #[cfg(feature = "with-telemetry")] telemetry_context: Option<&MyTelemetryContext>,
