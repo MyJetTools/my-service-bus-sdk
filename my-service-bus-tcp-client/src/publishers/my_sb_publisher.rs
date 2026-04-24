@@ -4,7 +4,8 @@ use my_service_bus_abstractions::{
     publisher::MessageToPublish, MyServiceBusPublisherClient, PublishError,
 };
 use my_service_bus_tcp_shared::{MySbTcpConnection, MySbTcpContract};
-use tokio::sync::Mutex;
+use parking_lot::Mutex;
+
 
 use super::{MySbPublisherData, PublishProcessByConnection};
 
@@ -20,36 +21,36 @@ impl MySbPublishers {
         }
     }
 
-    pub async fn set_confirmed(&self, request_id: i64) {
-        let mut write_access = self.data.lock().await;
-        write_access.confirm(request_id).await;
+    pub fn set_confirmed(&self, request_id: i64) {
+        let mut write_access = self.data.lock();
+        write_access.confirm(request_id);
     }
 
-    pub async fn new_connection(&self, connection: Arc<MySbTcpConnection>) {
+    pub  fn new_connection(&self, connection: Arc<MySbTcpConnection>) {
         {
-            let mut write_access = self.data.lock().await;
+            let mut write_access = self.data.lock();
             write_access.connection = Some(PublishProcessByConnection::new(connection.clone()));
         }
 
-        for topic_id in self.get_topics_to_create().await {
+        for topic_id in self.get_topics_to_create() {
             let packet = MySbTcpContract::CreateTopicIfNotExists { topic_id };
             connection.send(&packet);
         }
     }
 
-    pub async fn disconnect(&self) {
-        let mut write_access = self.data.lock().await;
+    pub fn disconnect(&self) {
+        let mut write_access = self.data.lock();
         write_access.disconnect();
     }
 
-    pub async fn create_topic_if_not_exists(&self, topic_id: String) {
-        let mut write_access = self.data.lock().await;
+    pub fn create_topic_if_not_exists(&self, topic_id: String) {
+        let mut write_access = self.data.lock();
         write_access.topics_to_create.insert(topic_id, 0);
     }
 
-    pub async fn get_topics_to_create(&self) -> Vec<String> {
+    pub fn get_topics_to_create(&self) -> Vec<String> {
         let mut result = Vec::new();
-        let write_access = self.data.lock().await;
+        let write_access = self.data.lock();
 
         for topic_id in write_access.topics_to_create.keys() {
             result.push(topic_id.to_string());
@@ -61,7 +62,7 @@ impl MySbPublishers {
     async fn wait_until_connection_is_restored(&self) {
         loop {
             let has_connection = {
-                let read_access = self.data.lock().await;
+                let read_access = self.data.lock();
                 read_access.connection.is_some()
             };
 
@@ -97,7 +98,7 @@ impl MyServiceBusPublisherClient for MySbPublishers {
 
         loop {
             let awaiter_result = {
-                let mut write_access = self.data.lock().await;
+                let mut write_access = self.data.lock();
 
                 let result = if to_send.is_none() {
                     let result = write_access
@@ -105,8 +106,7 @@ impl MyServiceBusPublisherClient for MySbPublishers {
                             topic_id,
                             messages,
                             my_service_bus_tcp_shared::DEFAULT_TCP_PROTOCOL_VERSION.into(),
-                        )
-                        .await;
+                        );
 
                     match result {
                         Ok(result) => {
@@ -124,8 +124,7 @@ impl MyServiceBusPublisherClient for MySbPublishers {
                         let (request_id, tcp_contract) = to_send.as_mut().unwrap();
 
                         let awaiter = write_access
-                            .publish_to_socket(tcp_contract, *request_id)
-                            .await;
+                            .publish_to_socket(tcp_contract, *request_id);
 
                         Ok(awaiter)
                     }

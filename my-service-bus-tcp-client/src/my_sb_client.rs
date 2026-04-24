@@ -81,15 +81,14 @@ impl MyServiceBusClient {
             .await;
     }
 
-    pub async fn get_publisher<TModel: MySbMessageSerializer + GetMySbModelTopicId>(
+    pub fn get_publisher<TModel: MySbMessageSerializer + GetMySbModelTopicId>(
         &self,
         do_retries: bool,
     ) -> MyServiceBusPublisher<TModel> {
         let topic_id = TModel::get_topic_id();
         self.data
             .publishers
-            .create_topic_if_not_exists(topic_id.to_string())
-            .await;
+            .create_topic_if_not_exists(topic_id.to_string());
         MyServiceBusPublisher::new(
             topic_id.to_string(),
             self.data.publishers.clone(),
@@ -98,7 +97,7 @@ impl MyServiceBusClient {
         )
     }
 
-    pub async fn get_publisher_with_internal_queue<
+    pub fn get_publisher_with_internal_queue<
         TModel: MySbMessageSerializer + GetMySbModelTopicId,
     >(
         &self,
@@ -106,8 +105,7 @@ impl MyServiceBusClient {
         let topic_id = TModel::get_topic_id();
         self.data
             .publishers
-            .create_topic_if_not_exists(topic_id.to_string())
-            .await;
+            .create_topic_if_not_exists(topic_id.to_string());
         PublisherWithInternalQueue::new(
             topic_id.to_string(),
             self.data.publishers.clone(),

@@ -31,7 +31,7 @@ impl MySbSubscribers {
         write_access.add(topic_id, queue_id, callback);
     }
 
-    pub fn new_messages(
+    pub async fn new_messages(
         &self,
         topic_id: String,
         queue_id: String,
@@ -46,7 +46,7 @@ impl MySbSubscribers {
 
         if let Some(callback) = callback {
             callback
-                .new_events(messages, confirmation_id, connection_id);
+                .new_events(messages, confirmation_id, connection_id).await;
         }
     }
 

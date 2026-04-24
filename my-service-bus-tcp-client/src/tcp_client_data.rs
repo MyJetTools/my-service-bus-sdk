@@ -33,7 +33,7 @@ impl my_tcp_sockets::SocketEventCallback<MySbTcpContract, MySbTcpSerializer, MyS
 
         super::new_connection_handler::send_packet_versions(&connection);
 
-        self.publishers.new_connection(connection.clone()).await;
+        self.publishers.new_connection(connection.clone());
         self.subscribers.new_connection(connection.clone());
 
         self.has_connection
@@ -43,14 +43,14 @@ impl my_tcp_sockets::SocketEventCallback<MySbTcpContract, MySbTcpSerializer, MyS
     async fn disconnected(&mut self, _connection: Arc<MySbTcpConnection>) {
         self.has_connection
             .store(false, std::sync::atomic::Ordering::SeqCst);
-        self.publishers.disconnect().await;
+        self.publishers.disconnect();
         self.subscribers.disconnect();
     }
 
     async fn payload(&mut self, connection: &Arc<MySbTcpConnection>, contract: MySbTcpContract) {
         match contract {
             my_service_bus_tcp_shared::MySbTcpContract::PublishResponse { request_id } => {
-                self.publishers.set_confirmed(request_id).await;
+                self.publishers.set_confirmed(request_id);
             }
             my_service_bus_tcp_shared::MySbTcpContract::NewMessages(mut model) => {
                 if let Some(auto_confirm_message) = self.ignore_message.as_ref() {
@@ -70,7 +70,7 @@ impl my_tcp_sockets::SocketEventCallback<MySbTcpContract, MySbTcpSerializer, MyS
                         model.confirmation_id,
                         connection.id,
                         model.messages,
-                    );
+                    ).await;
             }
             _ => {}
         }
