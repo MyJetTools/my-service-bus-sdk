@@ -29,4 +29,20 @@ impl TopicQueueType {
             (true, true) => TopicQueueType::DeleteOnDisconnectWithSingleConnection,
         }
     }
+
+    pub fn is_auto_delete(&self) -> bool {
+        matches!(
+            self,
+            TopicQueueType::DeleteOnDisconnect
+                | TopicQueueType::DeleteOnDisconnectWithSingleConnection
+        )
+    }
+
+    pub fn is_single_connection(&self) -> bool {
+        matches!(
+            self,
+            TopicQueueType::PermanentWithSingleConnection
+                | TopicQueueType::DeleteOnDisconnectWithSingleConnection
+        )
+    }
 }
