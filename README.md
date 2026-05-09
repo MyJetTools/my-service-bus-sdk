@@ -68,7 +68,8 @@ publisher.publish_chunk_and_forget(msgs).await?; // batch
 client
     .subscribe::<MyContract>(
         "queue-id",
-        TopicQueueType::DeleteOnDisconnect, // or PermanentWithSingleConnection, etc.
+        true,  // auto_delete   — delete the queue when the subscriber disconnects
+        false, // single_connection — only one active connection at a time
         Arc::new(MySubscriber {}),
     )
     .await;
@@ -93,7 +94,7 @@ SB_IGNORE_MESSAGE=TOPIC_ID=xxx;QUEUE_ID=xxx;MESSAGE_ID=xxx
 ## Operational notes
 - Reconnect loop sleeps 1s while waiting for connection.
 - Consider idempotent handlers; publisher retries can duplicate sends on reconnect.
-- `TopicQueueType` recap:
-  - `DeleteOnDisconnect`: ephemeral queue removed after a timeout on disconnect (short reconnects—e.g., within ~20s—keep the queue intact).
-  - `Permanent`: durable queue persists.
-  - `PermanentWithSingleConnection`: durable queue, and a new connection will drop the previous one.
+- Queue flags recap (the two `subscribe` parameters combine into all 4 protocol variants):
+  - `auto_delete = false`: durable queue persists.
+  - `auto_delete = true`: ephemeral queue removed after a timeout on disconnect (short reconnects — e.g., within ~20s — keep the queue intact).
+  - `single_connection = true`: a new connection will drop the previous one.

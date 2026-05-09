@@ -118,7 +118,8 @@ impl MyServiceBusClient {
     >(
         &self,
         queue_id: impl Into<StrOrString<'static>>,
-        queue_type: TopicQueueType,
+        auto_delete: bool,
+        single_connection: bool,
         callback: Arc<dyn SubscriberCallback<TModel> + Send + Sync + 'static>,
     ) {
         let topic_id = TModel::get_topic_id();
@@ -127,7 +128,7 @@ impl MyServiceBusClient {
         let subscriber: Subscriber<TModel> = Subscriber::new(
             topic_id.into(),
             queue_id.clone(),
-            queue_type,
+            TopicQueueType::from_flags(auto_delete, single_connection),
             callback,
             self.data.logger.clone(),
             self.data.subscribers.clone(),
