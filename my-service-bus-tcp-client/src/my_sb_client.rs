@@ -113,7 +113,7 @@ impl MyServiceBusClient {
         )
     }
 
-    pub async fn subscribe<
+    pub fn subscribe<
         TModel: GetMySbModelTopicId + MySbMessageDeserializer<Item = TModel> + Send + Sync + 'static,
     >(
         &self,
