@@ -1,44 +1,34 @@
-#[cfg(target_os = "windows")] 
-pub fn get_settings_filename_path(file_name: &str) -> String{
-    let home_path = env!("HOME");
-    let filename = format!("{}\\{}", home_path, file_name);
-    filename
+#[cfg(unix)]
+fn get_home_dir() -> String {
+    std::env::var("HOME").expect("HOME environment variable is not set")
 }
 
-#[cfg(not(target_os = "windows"))] 
-pub fn get_settings_filename_path(file_name: &str) -> String{
-    let home_path = env!("HOME");
-    let filename = format!("{}/{}", home_path, file_name);
-    filename
+#[cfg(windows)]
+fn get_home_dir() -> String {
+    std::env::var("USERPROFILE").expect("USERPROFILE environment variable is not set")
+}
+
+pub fn get_settings_filename_path(file_name: &str) -> String {
+    let mut path = std::path::PathBuf::from(get_home_dir());
+    path.push(file_name);
+    path.to_string_lossy().into_owned()
 }
 
 #[cfg(test)]
 mod tests {
-
-    fn get_settings_directory() -> String{
-        let home_path = env!("HOME");
-        String::from(home_path)
-    }
+    use super::*;
 
     #[test]
-    #[cfg(target_os = "windows")] 
     fn test_format() {
         let file_name = "file";
-        let settings_name = super::get_settings_filename_path(file_name);
+        let settings_name = get_settings_filename_path(file_name);
 
-        let path_to_filename = format!("{}\\{}", get_settings_directory(), file_name);
+        let expected = {
+            let mut p = std::path::PathBuf::from(get_home_dir());
+            p.push(file_name);
+            p.to_string_lossy().into_owned()
+        };
 
-        assert_eq!(settings_name, String::from(path_to_filename));
-    }
-
-    #[test]
-    #[cfg(not(target_os = "windows"))] 
-    fn test_format() {
-        let file_name = "file";
-        let settings_name = super::get_settings_filename_path(file_name);
-
-        let path_to_filename = format!("{}/{}", get_settings_directory(), file_name);
-
-        assert_eq!(settings_name, String::from(path_to_filename));
+        assert_eq!(settings_name, expected);
     }
 }
