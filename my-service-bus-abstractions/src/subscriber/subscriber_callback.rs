@@ -1,8 +1,12 @@
+use crate::queue_with_intervals::QueueWithIntervals;
+
 use super::{MessagesReader, MySbMessageDeserializer};
 
 #[derive(Debug)]
 pub enum MySbSubscriberHandleError {
     AllMessagesAreNotDelivered,
+    TheMessagesAreNotDelivered(QueueWithIntervals),
+    TheOnlyMessagesDelivered(QueueWithIntervals),
     Other(String),
 }
 

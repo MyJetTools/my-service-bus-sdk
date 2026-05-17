@@ -14,12 +14,18 @@ pub struct MessagesReaderInner<TMessageModel: MySbMessageDeserializer<Item = TMe
     #[cfg(feature = "with-telemetry")]
     pub current_message_telemetry: Option<super::DeliveredMessageTelemetry>,
     pub messages: VecDeque<MySbDeliveredMessage<TMessageModel>>,
+    pub force_all_failed: bool,
+    pub total_messages_ids: QueueWithIntervals,
 }
 
 impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>>
     MessagesReaderInner<TMessageModel>
 {
     pub fn new(messages: VecDeque<MySbDeliveredMessage<TMessageModel>>) -> Self {
+        let mut total_messages_ids = QueueWithIntervals::new();
+        for msg in messages.iter() {
+            total_messages_ids.enqueue(msg.id.get_value());
+        }
         Self {
             delivered: QueueWithIntervals::new(),
             last_time_confirmation: DateTimeAsMicroseconds::now(),
@@ -28,6 +34,8 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>>
             messages,
             #[cfg(feature = "with-telemetry")]
             current_message_telemetry: None,
+            force_all_failed: false,
+            total_messages_ids,
         }
     }
 
