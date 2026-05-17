@@ -76,14 +76,44 @@ client
 
 #[async_trait::async_trait]
 impl SubscriberCallback<MyContract> for MySubscriber {
-    async fn new_events(&self, mut messages_reader: MessagesReader<MyContract>) {
-        for msg in messages_reader.get_messages() {
-            // handle message
-            messages_reader.handled_ok(&msg);
+    async fn handle_messages(
+        &self,
+        messages_reader: &MessagesReader<MyContract>,
+    ) -> Result<(), MySbSubscriberHandleError> {
+        while let Some(msg) = messages_reader.get_next_message().await {
+            // handle msg — iterating with get_next_message marks the previous
+            // message as delivered automatically
         }
+        Ok(())
     }
 }
 ```
+
+### Delivery confirmation via `Result`
+
+`handle_messages` returns `Result<(), MySbSubscriberHandleError>`. The variant
+you return controls the final confirmation packet the SDK sends to the broker
+when the `MessagesReader` is dropped:
+
+| Return value | TCP confirmation sent to broker |
+|---|---|
+| `Ok(())` | Confirmation is derived from iteration state — `confirm_delivery(true)` if all messages were pulled via `get_next_message`, `confirm_some_messages_ok` for a partial set, `confirm_delivery(false)` if none. |
+| `Err(AllMessagesAreNotDelivered)` | `AllMessagesConfirmedAsFail` — the whole batch is force-confirmed as not delivered, regardless of how far you iterated. |
+| `Err(TheMessagesAreNotDelivered(qwi))` | `ConfirmSomeMessagesAsOk` with `total − qwi` as the delivered subset. If `qwi` covers all messages → `AllMessagesConfirmedAsFail`; if empty → `NewMessagesConfirmation`. |
+| `Err(TheOnlyMessagesDelivered(qwi))` | `ConfirmSomeMessagesAsOk` with `qwi` as the delivered subset. Same edge cases as above. |
+| `Err(Other(String))` | Writes a fatal log entry with the message; the broker confirmation falls back to the iteration-based path (same as `Ok`). Use this only for unexpected failures. |
+
+`qwi` is a `my_service_bus_abstractions::queue_with_intervals::QueueWithIntervals`
+(default generic `<i64>`) built from `MessageId::get_value()`:
+
+```rust
+let mut failed = QueueWithIntervals::new();
+failed.enqueue(msg.id.get_value());
+return Err(MySbSubscriberHandleError::TheMessagesAreNotDelivered(failed));
+```
+
+For per-message control inside `Ok` flow, use `MySbDeliveredMessage::mark_as_not_delivered().await`
+to drop the current message from the delivered set without bailing out of the whole batch.
 
 ## Ignore specific message
 Set env var to skip delivery for a specific message:
