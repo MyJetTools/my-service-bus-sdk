@@ -23,6 +23,18 @@ const ALL_MESSAGES_CONFIRMED_AS_FAIL: &str = "AllMessagesConfirmedAsFail";
 
 const CONFIRM_SOME_MESSAGES_AS_OK: &str = "ConfirmSomeMessagesAsOk";
 
+const NODE_GREETING: &str = "NodeGreeting";
+const NODE_PUBLISH: &str = "NodePublish";
+const NODE_PUBLISH_RESPONSE: &str = "NodePublishResponse";
+const NODE_SUBSCRIBE: &str = "NodeSubscribe";
+const NODE_SUBSCRIBE_RESPONSE: &str = "NodeSubscribeResponse";
+const NODE_UNSUBSCRIBE: &str = "NodeUnsubscribe";
+const NODE_NEW_MESSAGES: &str = "NodeNewMessages";
+const NODE_NEW_MESSAGES_CONFIRMATION: &str = "NodeNewMessagesConfirmation";
+const NODE_ALL_MESSAGES_CONFIRMED_AS_FAIL: &str = "NodeAllMessagesConfirmedAsFail";
+const NODE_CONFIRM_SOME_MESSAGES_AS_OK: &str = "NodeConfirmSomeMessagesAsOk";
+const NODE_INTERMEDIARY_CONFIRM: &str = "NodeIntermediaryConfirm";
+
 impl MySbTcpContract {
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -77,6 +89,19 @@ impl MySbTcpContract {
                 confirmation_id: _,
                 delivered: _,
             } => CONFIRM_SOME_MESSAGES_AS_OK,
+            MySbTcpContract::NodeGreeting { .. } => NODE_GREETING,
+            MySbTcpContract::NodePublish { .. } => NODE_PUBLISH,
+            MySbTcpContract::NodePublishResponse { .. } => NODE_PUBLISH_RESPONSE,
+            MySbTcpContract::NodeSubscribe { .. } => NODE_SUBSCRIBE,
+            MySbTcpContract::NodeSubscribeResponse { .. } => NODE_SUBSCRIBE_RESPONSE,
+            MySbTcpContract::NodeUnsubscribe { .. } => NODE_UNSUBSCRIBE,
+            MySbTcpContract::NodeNewMessages { .. } => NODE_NEW_MESSAGES,
+            MySbTcpContract::NodeNewMessagesConfirmation { .. } => NODE_NEW_MESSAGES_CONFIRMATION,
+            MySbTcpContract::NodeAllMessagesConfirmedAsFail { .. } => {
+                NODE_ALL_MESSAGES_CONFIRMED_AS_FAIL
+            }
+            MySbTcpContract::NodeConfirmSomeMessagesAsOk { .. } => NODE_CONFIRM_SOME_MESSAGES_AS_OK,
+            MySbTcpContract::NodeIntermediaryConfirm { .. } => NODE_INTERMEDIARY_CONFIRM,
         }
     }
 }

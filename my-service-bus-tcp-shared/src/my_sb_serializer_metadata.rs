@@ -58,6 +58,10 @@ impl TcpSerializerState<MySbTcpContract> for MySbSerializerState {
                 name: _,
                 protocol_version: _,
             } => true,
+            MySbTcpContract::NodeGreeting {
+                name: _,
+                protocol_version: _,
+            } => true,
             MySbTcpContract::PacketVersions { packet_versions: _ } => true,
             _ => false,
         }
@@ -66,6 +70,12 @@ impl TcpSerializerState<MySbTcpContract> for MySbSerializerState {
     fn apply_tcp_contract(&mut self, contract: &MySbTcpContract) {
         match contract {
             MySbTcpContract::Greeting {
+                name: _,
+                protocol_version,
+            } => {
+                self.tcp_protocol_version = (*protocol_version).into();
+            }
+            MySbTcpContract::NodeGreeting {
                 name: _,
                 protocol_version,
             } => {

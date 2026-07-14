@@ -17,6 +17,35 @@ pub type RequestId = i64;
 
 pub type ConfirmationId = i64;
 
+/// Identifier a node assigns to each virtual subscriber it registers with the
+/// master on behalf of a downstream client. Unique within a node↔master TCP
+/// session. The master treats each virtual subscriber as a separate logical
+/// subscriber for queue load-balancing purposes.
+pub type VirtualSubscriberId = i64;
+
+/// Sequence number used by the node to correlate `NodePublish` requests with
+/// `NodePublishResponse` acks. Monotonically increasing within a node↔master
+/// session.
+pub type NodeSequenceNumber = i64;
+
+/// One topic's worth of messages inside a `NodePublish` packet.
+#[derive(Debug, Clone)]
+pub struct NodeTopicPublish {
+    pub topic_id: String,
+    pub persist_immediately: bool,
+    pub data_to_publish: Vec<MessageToPublish>,
+}
+
+/// Ack info for one topic inside a `NodePublishResponse`. The range
+/// `[first_message_id, last_message_id]` is the contiguous set of IDs the master
+/// assigned to the messages in that topic for this packet.
+#[derive(Debug, Clone)]
+pub struct NodeTopicAck {
+    pub topic_id: String,
+    pub first_message_id: i64,
+    pub last_message_id: i64,
+}
+
 #[derive(Debug, Clone)]
 pub enum MySbTcpContract {
     Ping,
@@ -73,6 +102,66 @@ pub enum MySbTcpContract {
     },
 
     ConfirmSomeMessagesAsOk {
+        packet_version: u8,
+        topic_id: String,
+        queue_id: String,
+        confirmation_id: ConfirmationId,
+        delivered: Vec<QueueIndexRange<i64>>,
+    },
+
+    // ----- Node-mode packets (see my-service-bus-node) -----
+    NodeGreeting {
+        name: String,
+        protocol_version: i32,
+    },
+    NodePublish {
+        sequence_number: NodeSequenceNumber,
+        topics: Vec<NodeTopicPublish>,
+    },
+    NodePublishResponse {
+        sequence_number: NodeSequenceNumber,
+        topics: Vec<NodeTopicAck>,
+    },
+    NodeSubscribe {
+        virtual_subscriber_id: VirtualSubscriberId,
+        topic_id: String,
+        queue_id: String,
+        queue_type: TopicQueueType,
+    },
+    NodeSubscribeResponse {
+        virtual_subscriber_id: VirtualSubscriberId,
+        topic_id: String,
+        queue_id: String,
+    },
+    NodeUnsubscribe {
+        virtual_subscriber_id: VirtualSubscriberId,
+    },
+    NodeNewMessages {
+        virtual_subscriber_id: VirtualSubscriberId,
+        new_messages: NewMessagesModel,
+    },
+    NodeNewMessagesConfirmation {
+        virtual_subscriber_id: VirtualSubscriberId,
+        topic_id: String,
+        queue_id: String,
+        confirmation_id: ConfirmationId,
+    },
+    NodeAllMessagesConfirmedAsFail {
+        virtual_subscriber_id: VirtualSubscriberId,
+        topic_id: String,
+        queue_id: String,
+        confirmation_id: ConfirmationId,
+    },
+    NodeConfirmSomeMessagesAsOk {
+        virtual_subscriber_id: VirtualSubscriberId,
+        packet_version: u8,
+        topic_id: String,
+        queue_id: String,
+        confirmation_id: ConfirmationId,
+        delivered: Vec<QueueIndexRange<i64>>,
+    },
+    NodeIntermediaryConfirm {
+        virtual_subscriber_id: VirtualSubscriberId,
         packet_version: u8,
         topic_id: String,
         queue_id: String,
@@ -309,6 +398,208 @@ impl MySbTcpContract {
                 Ok(result)
             }
 
+            NODE_GREETING => {
+                let name =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                let protocol_version = socket_reader.read_i32().await?;
+                Ok(MySbTcpContract::NodeGreeting {
+                    name,
+                    protocol_version,
+                })
+            }
+
+            NODE_PUBLISH => {
+                let sequence_number = socket_reader.read_i64().await?;
+                let topics_count = socket_reader.read_i32().await? as usize;
+                let mut topics = Vec::with_capacity(topics_count);
+                for _ in 0..topics_count {
+                    let topic_id =
+                        crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                    let persist_immediately = socket_reader.read_bool().await?;
+                    let messages_count = socket_reader.read_i32().await? as usize;
+                    let mut data_to_publish = Vec::with_capacity(messages_count);
+                    for _ in 0..messages_count {
+                        let headers =
+                            crate::tcp_serializers::message_headers::deserialize(socket_reader)
+                                .await?;
+                        let content = socket_reader.read_byte_array().await?;
+                        data_to_publish.push(MessageToPublish { headers, content });
+                    }
+                    topics.push(NodeTopicPublish {
+                        topic_id,
+                        persist_immediately,
+                        data_to_publish,
+                    });
+                }
+                Ok(MySbTcpContract::NodePublish {
+                    sequence_number,
+                    topics,
+                })
+            }
+
+            NODE_PUBLISH_RESPONSE => {
+                let sequence_number = socket_reader.read_i64().await?;
+                let topics_count = socket_reader.read_i32().await? as usize;
+                let mut topics = Vec::with_capacity(topics_count);
+                for _ in 0..topics_count {
+                    let topic_id =
+                        crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                    let first_message_id = socket_reader.read_i64().await?;
+                    let last_message_id = socket_reader.read_i64().await?;
+                    topics.push(NodeTopicAck {
+                        topic_id,
+                        first_message_id,
+                        last_message_id,
+                    });
+                }
+                Ok(MySbTcpContract::NodePublishResponse {
+                    sequence_number,
+                    topics,
+                })
+            }
+
+            NODE_SUBSCRIBE => {
+                let virtual_subscriber_id = socket_reader.read_i64().await?;
+                let topic_id =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                let queue_id =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                let queue_type = TopicQueueType::from_u8(socket_reader.read_byte().await?);
+                Ok(MySbTcpContract::NodeSubscribe {
+                    virtual_subscriber_id,
+                    topic_id,
+                    queue_id,
+                    queue_type,
+                })
+            }
+
+            NODE_SUBSCRIBE_RESPONSE => {
+                let virtual_subscriber_id = socket_reader.read_i64().await?;
+                let topic_id =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                let queue_id =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                Ok(MySbTcpContract::NodeSubscribeResponse {
+                    virtual_subscriber_id,
+                    topic_id,
+                    queue_id,
+                })
+            }
+
+            NODE_UNSUBSCRIBE => {
+                let virtual_subscriber_id = socket_reader.read_i64().await?;
+                Ok(MySbTcpContract::NodeUnsubscribe {
+                    virtual_subscriber_id,
+                })
+            }
+
+            NODE_NEW_MESSAGES => {
+                use my_service_bus_abstractions::{MySbMessage, SbMessageHeaders};
+                let virtual_subscriber_id = socket_reader.read_i64().await?;
+                let topic_id =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                let queue_id =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                let confirmation_id = socket_reader.read_i64().await?;
+                let records_len = socket_reader.read_i32().await? as usize;
+                let mut messages = Vec::with_capacity(records_len);
+                for _ in 0..records_len {
+                    let id = socket_reader.read_i64().await?;
+                    let attempt_no = socket_reader.read_i32().await?;
+                    let headers =
+                        crate::tcp_serializers::message_headers::deserialize(socket_reader).await?;
+                    let content = socket_reader.read_byte_array().await?;
+                    let _ = SbMessageHeaders::new(); // touch import in case headers above empty
+                    messages.push(MySbMessage {
+                        id: id.into(),
+                        attempt_no,
+                        headers,
+                        content,
+                    });
+                }
+                Ok(MySbTcpContract::NodeNewMessages {
+                    virtual_subscriber_id,
+                    new_messages: NewMessagesModel {
+                        topic_id,
+                        queue_id,
+                        confirmation_id,
+                        messages,
+                    },
+                })
+            }
+
+            NODE_NEW_MESSAGES_CONFIRMATION => {
+                let virtual_subscriber_id = socket_reader.read_i64().await?;
+                let topic_id =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                let queue_id =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                let confirmation_id = socket_reader.read_i64().await?;
+                Ok(MySbTcpContract::NodeNewMessagesConfirmation {
+                    virtual_subscriber_id,
+                    topic_id,
+                    queue_id,
+                    confirmation_id,
+                })
+            }
+
+            NODE_ALL_MESSAGES_NOT_DELIVERED_CONFIRMATION => {
+                let virtual_subscriber_id = socket_reader.read_i64().await?;
+                let topic_id =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                let queue_id =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                let confirmation_id = socket_reader.read_i64().await?;
+                Ok(MySbTcpContract::NodeAllMessagesConfirmedAsFail {
+                    virtual_subscriber_id,
+                    topic_id,
+                    queue_id,
+                    confirmation_id,
+                })
+            }
+
+            NODE_CONFIRM_SOME_MESSAGES_AS_OK => {
+                let virtual_subscriber_id = socket_reader.read_i64().await?;
+                let packet_version = socket_reader.read_byte().await?;
+                let topic_id =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                let queue_id =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                let confirmation_id = socket_reader.read_i64().await?;
+                let delivered =
+                    crate::tcp_serializers::queue_with_intervals::deserialize(socket_reader)
+                        .await?;
+                Ok(MySbTcpContract::NodeConfirmSomeMessagesAsOk {
+                    virtual_subscriber_id,
+                    packet_version,
+                    topic_id,
+                    queue_id,
+                    confirmation_id,
+                    delivered,
+                })
+            }
+
+            NODE_INTERMEDIARY_CONFIRM => {
+                let virtual_subscriber_id = socket_reader.read_i64().await?;
+                let packet_version = socket_reader.read_byte().await?;
+                let topic_id =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                let queue_id =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+                let confirmation_id = socket_reader.read_i64().await?;
+                let delivered =
+                    crate::tcp_serializers::queue_with_intervals::deserialize(socket_reader)
+                        .await?;
+                Ok(MySbTcpContract::NodeIntermediaryConfirm {
+                    virtual_subscriber_id,
+                    packet_version,
+                    topic_id,
+                    queue_id,
+                    confirmation_id,
+                    delivered,
+                })
+            }
+
             _ => Err(ReadingTcpContractFail::InvalidPacketId(packet_no)),
         };
 
@@ -505,6 +796,152 @@ impl MySbTcpContract {
 
                 crate::tcp_serializers::queue_with_intervals::serialize(write_buffer, &delivered);
                 // result.into()
+            }
+            MySbTcpContract::NodeGreeting {
+                name,
+                protocol_version,
+            } => {
+                write_buffer.write_byte(NODE_GREETING);
+                write_buffer.write_pascal_string(name.as_str());
+                write_buffer.write_i32(*protocol_version);
+            }
+            MySbTcpContract::NodePublish {
+                sequence_number,
+                topics,
+            } => {
+                write_buffer.write_byte(NODE_PUBLISH);
+                write_buffer.write_i64(*sequence_number);
+                write_buffer.write_i32(topics.len() as i32);
+                for topic in topics {
+                    write_buffer.write_pascal_string(topic.topic_id.as_str());
+                    write_buffer.write_bool(topic.persist_immediately);
+                    // Always serialize messages with v3 layout (headers always
+                    // present) — Node packets only exist on protocol >= 3.
+                    crate::tcp_serializers::messages_to_publish::serialize_v3(
+                        write_buffer,
+                        topic.data_to_publish.as_slice(),
+                    );
+                }
+            }
+            MySbTcpContract::NodePublishResponse {
+                sequence_number,
+                topics,
+            } => {
+                write_buffer.write_byte(NODE_PUBLISH_RESPONSE);
+                write_buffer.write_i64(*sequence_number);
+                write_buffer.write_i32(topics.len() as i32);
+                for ack in topics {
+                    write_buffer.write_pascal_string(ack.topic_id.as_str());
+                    write_buffer.write_i64(ack.first_message_id);
+                    write_buffer.write_i64(ack.last_message_id);
+                }
+            }
+            MySbTcpContract::NodeSubscribe {
+                virtual_subscriber_id,
+                topic_id,
+                queue_id,
+                queue_type,
+            } => {
+                write_buffer.write_byte(NODE_SUBSCRIBE);
+                write_buffer.write_i64(*virtual_subscriber_id);
+                write_buffer.write_pascal_string(topic_id);
+                write_buffer.write_pascal_string(queue_id);
+                write_buffer.write_byte(queue_type.into_u8());
+            }
+            MySbTcpContract::NodeSubscribeResponse {
+                virtual_subscriber_id,
+                topic_id,
+                queue_id,
+            } => {
+                write_buffer.write_byte(NODE_SUBSCRIBE_RESPONSE);
+                write_buffer.write_i64(*virtual_subscriber_id);
+                write_buffer.write_pascal_string(topic_id);
+                write_buffer.write_pascal_string(queue_id);
+            }
+            MySbTcpContract::NodeUnsubscribe {
+                virtual_subscriber_id,
+            } => {
+                write_buffer.write_byte(NODE_UNSUBSCRIBE);
+                write_buffer.write_i64(*virtual_subscriber_id);
+            }
+            MySbTcpContract::NodeNewMessages {
+                virtual_subscriber_id,
+                new_messages,
+            } => {
+                use my_service_bus_abstractions::MyServiceBusMessage;
+                write_buffer.write_byte(NODE_NEW_MESSAGES);
+                write_buffer.write_i64(*virtual_subscriber_id);
+                write_buffer.write_pascal_string(new_messages.topic_id.as_str());
+                write_buffer.write_pascal_string(new_messages.queue_id.as_str());
+                write_buffer.write_i64(new_messages.confirmation_id);
+                write_buffer.write_i32(new_messages.messages.len() as i32);
+                // Always serialize with v3 layout for Node packets — they only
+                // exist on protocol >= 3 so headers are always present.
+                for msg in &new_messages.messages {
+                    write_buffer.write_i64(msg.get_id().get_value());
+                    write_buffer.write_i32(msg.get_attempt_no());
+                    crate::tcp_serializers::message_headers::serialize(
+                        write_buffer,
+                        msg.get_headers(),
+                    );
+                    write_buffer.write_byte_array(msg.get_content());
+                }
+            }
+            MySbTcpContract::NodeNewMessagesConfirmation {
+                virtual_subscriber_id,
+                topic_id,
+                queue_id,
+                confirmation_id,
+            } => {
+                write_buffer.write_byte(NODE_NEW_MESSAGES_CONFIRMATION);
+                write_buffer.write_i64(*virtual_subscriber_id);
+                write_buffer.write_pascal_string(topic_id);
+                write_buffer.write_pascal_string(queue_id);
+                write_buffer.write_i64(*confirmation_id);
+            }
+            MySbTcpContract::NodeAllMessagesConfirmedAsFail {
+                virtual_subscriber_id,
+                topic_id,
+                queue_id,
+                confirmation_id,
+            } => {
+                write_buffer.write_byte(NODE_ALL_MESSAGES_NOT_DELIVERED_CONFIRMATION);
+                write_buffer.write_i64(*virtual_subscriber_id);
+                write_buffer.write_pascal_string(topic_id);
+                write_buffer.write_pascal_string(queue_id);
+                write_buffer.write_i64(*confirmation_id);
+            }
+            MySbTcpContract::NodeConfirmSomeMessagesAsOk {
+                virtual_subscriber_id,
+                packet_version,
+                topic_id,
+                queue_id,
+                confirmation_id,
+                delivered,
+            } => {
+                write_buffer.write_byte(NODE_CONFIRM_SOME_MESSAGES_AS_OK);
+                write_buffer.write_i64(*virtual_subscriber_id);
+                write_buffer.write_byte(*packet_version);
+                write_buffer.write_pascal_string(topic_id);
+                write_buffer.write_pascal_string(queue_id);
+                write_buffer.write_i64(*confirmation_id);
+                crate::tcp_serializers::queue_with_intervals::serialize(write_buffer, delivered);
+            }
+            MySbTcpContract::NodeIntermediaryConfirm {
+                virtual_subscriber_id,
+                packet_version,
+                topic_id,
+                queue_id,
+                confirmation_id,
+                delivered,
+            } => {
+                write_buffer.write_byte(NODE_INTERMEDIARY_CONFIRM);
+                write_buffer.write_i64(*virtual_subscriber_id);
+                write_buffer.write_byte(*packet_version);
+                write_buffer.write_pascal_string(topic_id);
+                write_buffer.write_pascal_string(queue_id);
+                write_buffer.write_i64(*confirmation_id);
+                crate::tcp_serializers::queue_with_intervals::serialize(write_buffer, delivered);
             }
         }
     }
@@ -810,6 +1247,155 @@ mod tests {
             _ => {
                 panic!("Invalid Packet Type");
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_node_publish_roundtrip() {
+        let metadata = MySbSerializerState::new(3);
+
+        let msg1 = MessageToPublish {
+            content: vec![1, 2, 3],
+            headers: SbMessageHeaders::new().add("h1", "v1"),
+        };
+        let msg2 = MessageToPublish {
+            content: vec![4, 5, 6, 7],
+            headers: SbMessageHeaders::new(),
+        };
+
+        let packet = MySbTcpContract::NodePublish {
+            sequence_number: 42,
+            topics: vec![
+                NodeTopicPublish {
+                    topic_id: "topic-a".to_string(),
+                    persist_immediately: true,
+                    data_to_publish: vec![msg1.clone()],
+                },
+                NodeTopicPublish {
+                    topic_id: "topic-b".to_string(),
+                    persist_immediately: false,
+                    data_to_publish: vec![msg2.clone()],
+                },
+            ],
+        };
+
+        let mut bytes = Vec::new();
+        packet.serialize(&mut bytes, &metadata);
+
+        let mut reader = SocketReaderInMem::new(bytes);
+        let result = MySbTcpContract::deserialize(&mut reader, &metadata)
+            .await
+            .unwrap();
+
+        match result {
+            MySbTcpContract::NodePublish {
+                sequence_number,
+                topics,
+            } => {
+                assert_eq!(42, sequence_number);
+                assert_eq!(2, topics.len());
+
+                assert_eq!("topic-a", topics[0].topic_id);
+                assert!(topics[0].persist_immediately);
+                assert_eq!(1, topics[0].data_to_publish.len());
+                assert_eq!(msg1.content, topics[0].data_to_publish[0].content);
+                assert_eq!(
+                    "v1",
+                    topics[0].data_to_publish[0]
+                        .headers
+                        .iter()
+                        .next()
+                        .unwrap()
+                        .1
+                );
+
+                assert_eq!("topic-b", topics[1].topic_id);
+                assert!(!topics[1].persist_immediately);
+                assert_eq!(1, topics[1].data_to_publish.len());
+                assert_eq!(msg2.content, topics[1].data_to_publish[0].content);
+                assert_eq!(0, topics[1].data_to_publish[0].headers.len());
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_node_publish_response_roundtrip() {
+        let metadata = MySbSerializerState::new(3);
+
+        let packet = MySbTcpContract::NodePublishResponse {
+            sequence_number: 99,
+            topics: vec![
+                NodeTopicAck {
+                    topic_id: "t1".to_string(),
+                    first_message_id: 100,
+                    last_message_id: 199,
+                },
+                NodeTopicAck {
+                    topic_id: "t2".to_string(),
+                    first_message_id: 1000,
+                    last_message_id: 1000,
+                },
+            ],
+        };
+
+        let mut bytes = Vec::new();
+        packet.serialize(&mut bytes, &metadata);
+
+        let mut reader = SocketReaderInMem::new(bytes);
+        let result = MySbTcpContract::deserialize(&mut reader, &metadata)
+            .await
+            .unwrap();
+
+        match result {
+            MySbTcpContract::NodePublishResponse {
+                sequence_number,
+                topics,
+            } => {
+                assert_eq!(99, sequence_number);
+                assert_eq!(2, topics.len());
+                assert_eq!("t1", topics[0].topic_id);
+                assert_eq!(100, topics[0].first_message_id);
+                assert_eq!(199, topics[0].last_message_id);
+                assert_eq!("t2", topics[1].topic_id);
+                assert_eq!(1000, topics[1].first_message_id);
+                assert_eq!(1000, topics[1].last_message_id);
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_node_subscribe_roundtrip() {
+        let metadata = MySbSerializerState::new(3);
+
+        let packet = MySbTcpContract::NodeSubscribe {
+            virtual_subscriber_id: 7,
+            topic_id: "topic".to_string(),
+            queue_id: "queue".to_string(),
+            queue_type: TopicQueueType::Permanent,
+        };
+
+        let mut bytes = Vec::new();
+        packet.serialize(&mut bytes, &metadata);
+        let mut reader = SocketReaderInMem::new(bytes);
+        let result = MySbTcpContract::deserialize(&mut reader, &metadata)
+            .await
+            .unwrap();
+
+        match result {
+            MySbTcpContract::NodeSubscribe {
+                virtual_subscriber_id,
+                topic_id,
+                queue_id,
+                queue_type,
+            } => {
+                assert_eq!(7, virtual_subscriber_id);
+                assert_eq!("topic", topic_id);
+                assert_eq!("queue", queue_id);
+                assert!(matches!(queue_type, TopicQueueType::Permanent));
+            }
+            _ => panic!("Wrong variant"),
         }
     }
 
