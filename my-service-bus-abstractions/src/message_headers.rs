@@ -68,6 +68,10 @@ impl SbMessageHeaders {
         self.headers.iter()
     }
 
+    pub fn into_iter(self) -> impl Iterator<Item = (String, String)> {
+        self.headers.into_iter()
+    }
+
     pub fn remove(&mut self, key: &str) -> Option<String> {
         let index = self.headers.iter().position(|(k, _)| k == key)?;
 

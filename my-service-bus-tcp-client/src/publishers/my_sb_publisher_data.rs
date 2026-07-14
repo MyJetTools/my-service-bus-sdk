@@ -26,7 +26,7 @@ impl MySbPublisherData {
         return self.request_id;
     }
 
-    pub async fn compile_publish_payload(
+    pub fn compile_publish_payload(
         &mut self,
         topic_id: &str,
         messages: &[MessageToPublish],
@@ -52,14 +52,14 @@ impl MySbPublisherData {
         Ok((request_id, MySbTcpContract::Raw(payload)))
     }
 
-    pub async fn publish_to_socket(
+    pub fn publish_to_socket(
         &mut self,
         tcp_contract: &mut MySbTcpContract,
         request_id: i64,
     ) -> TaskCompletionAwaiter<(), PublishError> {
         let connection = self.connection.as_mut().unwrap();
 
-        connection.socket.send(tcp_contract).await;
+        connection.socket.send(tcp_contract);
 
         let mut task = TaskCompletion::new();
         let awaiter = task.get_awaiter();
@@ -69,7 +69,7 @@ impl MySbPublisherData {
         awaiter
     }
 
-    pub async fn confirm(&mut self, request_id: i64) {
+    pub fn confirm(&mut self, request_id: i64) {
         if let Some(connection) = self.connection.as_mut() {
             if let Some(mut request) = connection.requests.remove(&request_id) {
                 request.set_ok(());

@@ -7,6 +7,7 @@ use rust_extensions::date_time::DateTimeAsMicroseconds;
 use tokio::sync::Mutex;
 
 use crate::{
+    queue_with_intervals::QueueWithIntervals,
     subscriber::{MySbDeliveredMessage, MySbMessageDeserializer},
     MyServiceBusSubscriberClient,
 };
@@ -88,6 +89,29 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync 
 
         Some(next_message)
     }
+
+    pub async fn mark_all_failed(&self) {
+        let mut inner = self.inner.lock().await;
+        inner.force_all_failed = true;
+    }
+
+    pub async fn mark_messages_failed(&self, failed: QueueWithIntervals) {
+        let mut inner = self.inner.lock().await;
+        let mut delivered = inner.total_messages_ids.clone();
+        for id in failed.iter() {
+            let _ = delivered.remove(id);
+        }
+        inner.delivered = delivered;
+        inner.current_message_id = None;
+        inner.force_all_failed = false;
+    }
+
+    pub async fn mark_only_these_delivered(&self, delivered: QueueWithIntervals) {
+        let mut inner = self.inner.lock().await;
+        inner.delivered = delivered;
+        inner.current_message_id = None;
+        inner.force_all_failed = false;
+    }
 }
 
 impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync + 'static> Drop
@@ -121,7 +145,31 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync 
                 );
             }
 
-            if inner.delivered.queue_size() == total_messages_amount {
+            if inner.force_all_failed {
+                let mut log_context = HashMap::new();
+                log_context.insert("ConfirmationId".to_string(), confirmation_id.to_string());
+                log_context.insert("TopicId".to_string(), data.topic_id.as_str().to_string());
+                log_context.insert("QueueId".to_string(), data.queue_id.as_str().to_string());
+
+                data.logger.write_error(
+                    "Sending delivery confirmation".to_string(),
+                    "Subscriber returned AllMessagesAreNotDelivered — confirming all messages as fail"
+                        .to_string(),
+                    Some(log_context),
+                );
+
+                data.client.confirm_delivery(
+                    data.topic_id.as_str(),
+                    data.queue_id.as_str(),
+                    confirmation_id,
+                    connection_id,
+                    false,
+                );
+
+                if debug {
+                    println!("Forced: all messages confirmed as not Delivered")
+                }
+            } else if inner.delivered.queue_size() == total_messages_amount {
                 data.client.confirm_delivery(
                     data.topic_id.as_str(),
                     data.queue_id.as_str(),

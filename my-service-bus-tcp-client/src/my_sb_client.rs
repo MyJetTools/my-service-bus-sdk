@@ -42,7 +42,7 @@ impl TcpClientSocketSettings for TcpConnectionSettings {
 
 pub struct MyServiceBusClient {
     pub tcp_client: TcpClient,
-    data: Arc<TcpClientData>,
+    data: TcpClientData,
 }
 
 impl MyServiceBusClient {
@@ -67,7 +67,7 @@ impl MyServiceBusClient {
 
         Self {
             tcp_client: TcpClient::new(TCP_CLIENT_NAME.to_string(), Arc::new(tcp_settings)),
-            data: Arc::new(data),
+            data,
         }
     }
 
@@ -81,15 +81,14 @@ impl MyServiceBusClient {
             .await;
     }
 
-    pub async fn get_publisher<TModel: MySbMessageSerializer + GetMySbModelTopicId>(
+    pub fn get_publisher<TModel: MySbMessageSerializer + GetMySbModelTopicId>(
         &self,
         do_retries: bool,
     ) -> MyServiceBusPublisher<TModel> {
         let topic_id = TModel::get_topic_id();
         self.data
             .publishers
-            .create_topic_if_not_exists(topic_id.to_string())
-            .await;
+            .create_topic_if_not_exists(topic_id.to_string());
         MyServiceBusPublisher::new(
             topic_id.to_string(),
             self.data.publishers.clone(),
@@ -98,7 +97,7 @@ impl MyServiceBusClient {
         )
     }
 
-    pub async fn get_publisher_with_internal_queue<
+    pub fn get_publisher_with_internal_queue<
         TModel: MySbMessageSerializer + GetMySbModelTopicId,
     >(
         &self,
@@ -106,8 +105,7 @@ impl MyServiceBusClient {
         let topic_id = TModel::get_topic_id();
         self.data
             .publishers
-            .create_topic_if_not_exists(topic_id.to_string())
-            .await;
+            .create_topic_if_not_exists(topic_id.to_string());
         PublisherWithInternalQueue::new(
             topic_id.to_string(),
             self.data.publishers.clone(),
@@ -115,12 +113,13 @@ impl MyServiceBusClient {
         )
     }
 
-    pub async fn subscribe<
+    pub fn subscribe<
         TModel: GetMySbModelTopicId + MySbMessageDeserializer<Item = TModel> + Send + Sync + 'static,
     >(
         &self,
         queue_id: impl Into<StrOrString<'static>>,
-        queue_type: TopicQueueType,
+        auto_delete: bool,
+        single_connection: bool,
         callback: Arc<dyn SubscriberCallback<TModel> + Send + Sync + 'static>,
     ) {
         let topic_id = TModel::get_topic_id();
@@ -129,7 +128,7 @@ impl MyServiceBusClient {
         let subscriber: Subscriber<TModel> = Subscriber::new(
             topic_id.into(),
             queue_id.clone(),
-            queue_type,
+            TopicQueueType::from_flags(auto_delete, single_connection),
             callback,
             self.data.logger.clone(),
             self.data.subscribers.clone(),
@@ -138,8 +137,7 @@ impl MyServiceBusClient {
         let subscriber = Arc::new(subscriber);
         self.data
             .subscribers
-            .add(topic_id, queue_id.to_string(), subscriber)
-            .await;
+            .add(topic_id, queue_id.to_string(), subscriber);
     }
 
     pub fn has_connection(&self) -> bool {

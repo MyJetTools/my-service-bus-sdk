@@ -24,7 +24,7 @@ const ALL_MESSAGES_CONFIRMED_AS_FAIL: &str = "AllMessagesConfirmedAsFail";
 const CONFIRM_SOME_MESSAGES_AS_OK: &str = "ConfirmSomeMessagesAsOk";
 
 impl MySbTcpContract {
-    pub fn to_string(&self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             MySbTcpContract::Ping => PING_NAME,
             MySbTcpContract::Pong => PONG_NAME,
@@ -48,12 +48,7 @@ impl MySbTcpContract {
                 topic_id: _,
                 queue_id: _,
             } => SUBSCRIBER_RESPONSE,
-            MySbTcpContract::NewMessages {
-                topic_id: _,
-                messages: _,
-                confirmation_id: _,
-                queue_id: _,
-            } => NEW_MESSAGES,
+            MySbTcpContract::NewMessages(_) => NEW_MESSAGES,
             MySbTcpContract::Raw(_) => RAW_PAYLOAD,
             MySbTcpContract::NewMessagesConfirmation {
                 topic_id: _,

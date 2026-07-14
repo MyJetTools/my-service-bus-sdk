@@ -1,3 +1,5 @@
+use std::io::Cursor;
+
 use my_service_bus_abstractions::SbMessageHeaders;
 use my_tcp_sockets::{
     socket_reader::{ReadingTcpContractFail, SocketReader},
@@ -14,6 +16,23 @@ pub async fn deserialize<TSocketReader: SocketReader>(
     for _ in 0..headers_count {
         let key = super::pascal_string::deserialize(reader).await?;
         let value = super::pascal_string::deserialize(reader).await?;
+
+        result = result.add(key, value);
+    }
+
+    Ok(result)
+}
+
+pub fn read_from_mem(
+    reader: &mut Cursor<&[u8]>,
+) -> Result<SbMessageHeaders, ReadingTcpContractFail> {
+    let headers_count = super::byte::read_from_mem(reader)? as usize;
+
+    let mut result = SbMessageHeaders::with_capacity(headers_count);
+
+    for _ in 0..headers_count {
+        let key = super::pascal_string::read_from_mem(reader)?;
+        let value = super::pascal_string::read_from_mem(reader)?;
 
         result = result.add(key, value);
     }

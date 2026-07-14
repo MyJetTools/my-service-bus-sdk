@@ -14,8 +14,8 @@ use crate::{
 };
 
 use super::{
-    MessagesReader, MySbDeliveredMessage, MySbMessageDeserializer, SubscriberCallback,
-    TopicQueueType,
+    MessagesReader, MySbDeliveredMessage, MySbMessageDeserializer, MySbSubscriberHandleError,
+    SubscriberCallback, TopicQueueType,
 };
 
 pub struct SubscriberData {
@@ -185,6 +185,19 @@ async fn callback_new_messages<
 ) {
     let task = tokio::spawn(async move {
         if let Err(err) = callback.handle_messages(&mut reader).await {
+            match &err {
+                MySbSubscriberHandleError::AllMessagesAreNotDelivered => {
+                    reader.mark_all_failed().await;
+                }
+                MySbSubscriberHandleError::TheMessagesAreNotDelivered(failed) => {
+                    reader.mark_messages_failed(failed.clone()).await;
+                }
+                MySbSubscriberHandleError::TheOnlyMessagesDelivered(delivered) => {
+                    reader.mark_only_these_delivered(delivered.clone()).await;
+                }
+                MySbSubscriberHandleError::Other(_) => {}
+            }
+
             let mut ctx = HashMap::new();
 
             ctx.insert(
@@ -201,7 +214,7 @@ async fn callback_new_messages<
             );
             reader.data.logger.write_fatal_error(
                 "new_events".to_string(),
-                format!("Can not handle messages. Err: {}", err.msg),
+                format!("Can not handle messages. Err: {:?}", err),
                 Some(ctx),
             );
         }

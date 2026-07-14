@@ -4,7 +4,6 @@ use crate::{MySbTcpContract, MySbTcpSerializer, TcpProtocolVersion};
 
 use super::PacketVersions;
 
-pub const DEFAULT_TCP_PROTOCOL_VERSION: i32 = 3;
 #[derive(Debug, Clone)]
 pub struct PacketProtVer {
     pub packet_version: u8,
@@ -25,7 +24,7 @@ impl Default for MySbSerializerState {
 
     #[cfg(feature = "tcp-client")]
     fn default() -> Self {
-        let mut result = Self::new(DEFAULT_TCP_PROTOCOL_VERSION);
+        let mut result = Self::new(super::DEFAULT_TCP_PROTOCOL_VERSION);
         result
             .versions
             .set_packet_version(crate::tcp_message_id::NEW_MESSAGES, 1);

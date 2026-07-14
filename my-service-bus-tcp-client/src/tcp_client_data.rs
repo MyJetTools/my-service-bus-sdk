@@ -7,6 +7,7 @@ use rust_extensions::{Logger, StrOrString};
 
 use crate::{publishers::MySbPublishers, subscribers::MySbSubscribers, IgnoreMessage};
 
+#[derive(Clone)]
 pub struct TcpClientData {
     pub app_name: StrOrString<'static>,
     pub app_version: StrOrString<'static>,
@@ -22,55 +23,54 @@ pub struct TcpClientData {
 impl my_tcp_sockets::SocketEventCallback<MySbTcpContract, MySbTcpSerializer, MySbSerializerState>
     for TcpClientData
 {
-    async fn connected(&self, connection: Arc<MySbTcpConnection>) {
+    async fn connected(&mut self, connection: Arc<MySbTcpConnection>) {
         super::new_connection_handler::send_greeting(
             &connection,
             self.app_name.as_str(),
             self.app_version.as_str(),
             self.client_version.as_str(),
-        )
-        .await;
+        );
 
-        super::new_connection_handler::send_packet_versions(&connection).await;
+        super::new_connection_handler::send_packet_versions(&connection);
 
-        self.publishers.new_connection(connection.clone()).await;
-        self.subscribers.new_connection(connection.clone()).await;
+        self.publishers.new_connection(connection.clone());
+        self.subscribers.new_connection(connection.clone());
 
         self.has_connection
             .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
-    async fn disconnected(&self, _connection: Arc<MySbTcpConnection>) {
+    async fn disconnected(&mut self, _connection: Arc<MySbTcpConnection>) {
         self.has_connection
             .store(false, std::sync::atomic::Ordering::SeqCst);
-        self.publishers.disconnect().await;
-        self.subscribers.disconnect().await;
+        self.publishers.disconnect();
+        self.subscribers.disconnect();
     }
 
-    async fn payload(&self, connection: &Arc<MySbTcpConnection>, contract: MySbTcpContract) {
+    async fn payload(&mut self, connection: &Arc<MySbTcpConnection>, contract: MySbTcpContract) {
         match contract {
             my_service_bus_tcp_shared::MySbTcpContract::PublishResponse { request_id } => {
-                self.publishers.set_confirmed(request_id).await;
+                self.publishers.set_confirmed(request_id);
             }
-            my_service_bus_tcp_shared::MySbTcpContract::NewMessages {
-                topic_id,
-                queue_id,
-                confirmation_id,
-                mut messages,
-            } => {
+            my_service_bus_tcp_shared::MySbTcpContract::NewMessages(mut model) => {
                 if let Some(auto_confirm_message) = self.ignore_message.as_ref() {
-                    if auto_confirm_message.topic_id == topic_id
-                        && auto_confirm_message.queue_id == queue_id
+                    if auto_confirm_message.topic_id == model.topic_id
+                        && auto_confirm_message.queue_id == model.queue_id
                     {
-                        messages.retain(|itm| {
+                        model.messages.retain(|itm| {
                             itm.id.get_value() != auto_confirm_message.message_id.get_value()
                         });
                     }
                 }
 
                 self.subscribers
-                    .new_messages(topic_id, queue_id, confirmation_id, connection.id, messages)
-                    .await
+                    .new_messages(
+                        model.topic_id,
+                        model.queue_id,
+                        model.confirmation_id,
+                        connection.id,
+                        model.messages,
+                    ).await;
             }
             _ => {}
         }
