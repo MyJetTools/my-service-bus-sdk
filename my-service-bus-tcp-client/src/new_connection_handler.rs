@@ -26,6 +26,28 @@ pub fn send_greeting(
     socket_ctx.send(&greeting);
 }
 
+pub fn send_set_namespace(
+    socket_ctx: &TcpSocketConnection<MySbTcpContract, MySbTcpSerializer, MySbSerializerState>,
+    namespace: Option<&str>,
+) {
+    let Some(namespace) = namespace else {
+        return;
+    };
+
+    // Nodes which are not updated yet do not know the SET_NAMESPACE packet and their deserializer
+    // breaks the connection on the unknown packet id. Default namespace is the one they work with
+    // anyway - so we keep the wire compatible and send nothing.
+    if namespace == my_service_bus_shared::validators::DEFAULT_NAMESPACE {
+        return;
+    }
+
+    let set_namespace = MySbTcpContract::SetNamespace {
+        namespace: namespace.to_string(),
+    };
+
+    socket_ctx.send(&set_namespace);
+}
+
 pub fn send_packet_versions(
     socket_ctx: &TcpSocketConnection<MySbTcpContract, MySbTcpSerializer, MySbSerializerState>,
 ) {

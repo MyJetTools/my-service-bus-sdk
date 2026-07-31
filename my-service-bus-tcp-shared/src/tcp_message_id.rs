@@ -14,3 +14,4 @@ pub const REJECT: u8 = 12;
 pub const ALL_MESSAGES_NOT_DELIVERED_CONFIRMATION: u8 = 13;
 pub const CONFIRM_SOME_MESSAGES_AS_OK: u8 = 14;
 pub const INTERMEDIARY_CONFIRM: u8 = 15; //Confirms some messages within Delivery but not complete Delivery
+pub const SET_NAMESPACE: u8 = 16;

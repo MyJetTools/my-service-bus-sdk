@@ -11,6 +11,8 @@ use my_service_bus_abstractions::subscriber::Subscriber;
 use my_service_bus_abstractions::subscriber::SubscriberCallback;
 use my_service_bus_abstractions::subscriber::TopicQueueType;
 use my_service_bus_abstractions::{GetMySbModelTopicId, MySbMessageSerializer};
+use arc_swap::ArcSwapOption;
+use my_service_bus_shared::connection_string::parse_connection_string;
 use my_service_bus_tcp_shared::MySbSerializerFactory;
 use my_tcp_sockets::{TcpClient, TcpClientSocketSettings, TlsSettings};
 use rust_extensions::{Logger, StrOrString};
@@ -21,18 +23,45 @@ const TCP_CLIENT_NAME: &str = "MySbTcpClient";
 
 struct TcpConnectionSettings {
     my_sb_settings: Arc<dyn MyServiceBusSettings + Send + Sync + 'static>,
+    /// Namespace parsed out of the connection string. Shared with [`TcpClientData`] which sends
+    /// it to the server right after the Greeting.
+    namespace: Arc<ArcSwapOption<String>>,
 }
 
 impl TcpConnectionSettings {
-    pub fn new(my_sb_settings: Arc<dyn MyServiceBusSettings + Send + Sync + 'static>) -> Self {
-        Self { my_sb_settings }
+    pub fn new(
+        my_sb_settings: Arc<dyn MyServiceBusSettings + Send + Sync + 'static>,
+        namespace: Arc<ArcSwapOption<String>>,
+    ) -> Self {
+        Self {
+            my_sb_settings,
+            namespace,
+        }
     }
 }
 
 #[async_trait::async_trait]
 impl TcpClientSocketSettings for TcpConnectionSettings {
     async fn get_host_port(&self) -> Option<String> {
-        self.my_sb_settings.get_host_port().await.into()
+        let connection_string = self.my_sb_settings.get_host_port().await;
+
+        // Connection string is resolved before every connect attempt - so is the namespace,
+        // which the application can change in its settings without a restart.
+        let connection_string = match parse_connection_string(connection_string.as_str()) {
+            Ok(result) => result,
+            Err(err) => panic!(
+                "Invalid MyServiceBus connection string '{}'. {}",
+                connection_string, err
+            ),
+        };
+
+        self.namespace.store(
+            connection_string
+                .get_namespace_to_send()
+                .map(|namespace| Arc::new(namespace.to_string())),
+        );
+
+        connection_string.host.into()
     }
 
     async fn get_tls_settings(&self) -> Option<TlsSettings> {
@@ -52,9 +81,12 @@ impl MyServiceBusClient {
         settings: Arc<dyn MyServiceBusSettings + Send + Sync + 'static>,
         logger: Arc<dyn Logger + Send + Sync + 'static>,
     ) -> Self {
-        let tcp_settings = TcpConnectionSettings::new(settings);
+        let namespace = Arc::new(ArcSwapOption::empty());
+
+        let tcp_settings = TcpConnectionSettings::new(settings, namespace.clone());
 
         let data = TcpClientData {
+            namespace,
             publishers: Arc::new(MySbPublishers::new()),
             subscribers: Arc::new(MySbSubscribers::new()),
             logger,

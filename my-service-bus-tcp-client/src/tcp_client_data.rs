@@ -5,6 +5,8 @@ use my_service_bus_tcp_shared::{
 };
 use rust_extensions::{Logger, StrOrString};
 
+use arc_swap::ArcSwapOption;
+
 use crate::{publishers::MySbPublishers, subscribers::MySbSubscribers, IgnoreMessage};
 
 #[derive(Clone)]
@@ -12,6 +14,9 @@ pub struct TcpClientData {
     pub app_name: StrOrString<'static>,
     pub app_version: StrOrString<'static>,
     pub client_version: String,
+    /// Namespace resolved from the connection string on the last connect attempt. `None` means
+    /// the default namespace - nothing is sent to the server in that case.
+    pub namespace: Arc<ArcSwapOption<String>>,
     pub publishers: Arc<MySbPublishers>,
     pub subscribers: Arc<MySbSubscribers>,
     pub logger: Arc<dyn Logger + Send + Sync + 'static>,
@@ -29,6 +34,15 @@ impl my_tcp_sockets::SocketEventCallback<MySbTcpContract, MySbTcpSerializer, MyS
             self.app_name.as_str(),
             self.app_version.as_str(),
             self.client_version.as_str(),
+        );
+
+        // Namespace has to be fixed by the server before the very first publish or subscribe -
+        // hence it goes right after the Greeting.
+        let namespace = self.namespace.load_full();
+
+        super::new_connection_handler::send_set_namespace(
+            &connection,
+            namespace.as_ref().map(|namespace| namespace.as_str()),
         );
 
         super::new_connection_handler::send_packet_versions(&connection);
@@ -72,6 +86,15 @@ impl my_tcp_sockets::SocketEventCallback<MySbTcpContract, MySbTcpSerializer, MyS
                         model.messages,
                     ).await;
             }
+            my_service_bus_tcp_shared::MySbTcpContract::Reject { message } => {
+                self.logger.write_error(
+                    "MySbTcpClient".to_string(),
+                    format!("Packet is rejected by the server. Reason: {}", message),
+                    None,
+                );
+            }
+            //This one is sent by the client to the server only
+            my_service_bus_tcp_shared::MySbTcpContract::SetNamespace { .. } => {}
             _ => {}
         }
     }

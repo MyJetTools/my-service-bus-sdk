@@ -14,6 +14,8 @@ const NEW_MESSAGES_CONFIRMATION: &str = "NewMessagesConfirmation";
 
 const CREATE_TOPIC_IF_EXIST: &str = "CreateTopicIfExists";
 
+const SET_NAMESPACE: &str = "SetNamespace";
+
 const INTERMEDIARY_CONFIRM: &str = "IntermediaryConfirm";
 
 const PACKET_VERSIONS: &str = "PacketVersions";
@@ -56,6 +58,7 @@ impl MySbTcpContract {
                 confirmation_id: _,
             } => NEW_MESSAGES_CONFIRMATION,
             MySbTcpContract::CreateTopicIfNotExists { topic_id: _ } => CREATE_TOPIC_IF_EXIST,
+            MySbTcpContract::SetNamespace { namespace: _ } => SET_NAMESPACE,
             MySbTcpContract::IntermediaryConfirm {
                 packet_version: _,
                 topic_id: _,

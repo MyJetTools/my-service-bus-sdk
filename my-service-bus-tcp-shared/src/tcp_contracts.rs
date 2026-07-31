@@ -53,6 +53,9 @@ pub enum MySbTcpContract {
     CreateTopicIfNotExists {
         topic_id: String,
     },
+    SetNamespace {
+        namespace: String,
+    },
     IntermediaryConfirm {
         packet_version: u8,
         topic_id: String,
@@ -220,6 +223,15 @@ impl MySbTcpContract {
                     crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
 
                 let result = MySbTcpContract::CreateTopicIfNotExists { topic_id };
+
+                Ok(result)
+            }
+
+            SET_NAMESPACE => {
+                let namespace =
+                    crate::tcp_serializers::pascal_string::deserialize(socket_reader).await?;
+
+                let result = MySbTcpContract::SetNamespace { namespace };
 
                 Ok(result)
             }
@@ -416,6 +428,11 @@ impl MySbTcpContract {
                 write_buffer.write_pascal_string(topic_id);
                 //crate::tcp_serializers::pascal_string::serialize(&mut result, topic_id.as_str());
                 //result.into()
+            }
+            MySbTcpContract::SetNamespace { namespace } => {
+                write_buffer.write_byte(SET_NAMESPACE);
+
+                write_buffer.write_pascal_string(namespace);
             }
             MySbTcpContract::IntermediaryConfirm {
                 packet_version,
@@ -806,6 +823,39 @@ mod tests {
         match result {
             MySbTcpContract::PublishResponse { request_id } => {
                 assert_eq!(request_id_test, request_id);
+            }
+            _ => {
+                panic!("Invalid Packet Type");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_namespace_packet() {
+        const PROTOCOL_VERSION: i32 = 3;
+
+        let namespace_test = String::from("my-namespace");
+
+        let tcp_packet = MySbTcpContract::SetNamespace {
+            namespace: namespace_test.clone(),
+        };
+
+        let attr = MySbSerializerState::new(PROTOCOL_VERSION);
+
+        let mut serialized_data: Vec<u8> = Vec::new();
+        tcp_packet.serialize(&mut serialized_data, &attr);
+
+        assert_eq!(SET_NAMESPACE, serialized_data[0]);
+
+        let mut socket_reader = SocketReaderInMem::new(serialized_data);
+
+        let result = MySbTcpContract::deserialize(&mut socket_reader, &attr)
+            .await
+            .unwrap();
+
+        match result {
+            MySbTcpContract::SetNamespace { namespace } => {
+                assert_eq!(namespace_test, namespace);
             }
             _ => {
                 panic!("Invalid Packet Type");

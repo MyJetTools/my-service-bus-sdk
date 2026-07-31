@@ -7,7 +7,7 @@ This file captures the observed behavior and usage patterns from `my-service-bus
 - `tokio` with `full` features
 
 ## Settings
-Implement `MyServiceBusSettings` to supply the host/port:
+Implement `MyServiceBusSettings` to supply the connection string:
 ```rust
 #[derive(my_settings_reader::SettingsModel, Serialize, Deserialize, Debug, Clone)]
 pub struct SettingsModel {
@@ -23,6 +23,59 @@ impl MyServiceBusSettings for SettingsReader {
     }
 }
 ```
+
+### Connection string
+
+`get_host_port` returns a connection string. Two formats are accepted — the same shape
+MyNoSqlServer uses:
+
+| Value in settings | Host | Namespace |
+|---|---|---|
+| `127.0.0.1:6421` | `127.0.0.1:6421` | `default` |
+| `host=127.0.0.1:6421` | `127.0.0.1:6421` | `default` |
+| `host=127.0.0.1:6421;ns=alpha` | `127.0.0.1:6421` | `alpha` |
+
+The new format is recognized **only** by the leading `host=`. Anything else is taken as a bare
+host exactly as before — so existing settings files keep working untouched and nothing has to be
+migrated.
+
+```yaml
+# legacy - still valid, works against any bus
+MySb: 127.0.0.1:6421
+
+# with a namespace
+MySb: host=127.0.0.1:6421;ns=alpha
+```
+
+Rules for the new format:
+- `;` separated `key=value` pairs; spaces around `;` and `=` are trimmed.
+- Keys are case insensitive (`HOST=`/`NS=` are fine).
+- `host` is mandatory; `ns` is optional.
+- An unknown key (e.g. `namespace=` instead of `ns=`) is an **error** — better not to start at all
+  than to silently publish into the wrong namespace.
+- An invalid connection string panics on the connect attempt, with the reason in the message.
+
+Namespace name rules: only `a-z`, `0-9` and `-`, does not start with `-`, length 1..=63.
+Upper case is rejected rather than lower-cased — a typo has to fail loudly instead of creating
+a garbage namespace.
+
+The connection string is re-read before **every** connect attempt, so an application whose
+settings are dynamic can change the namespace without a restart — it takes effect on the next
+reconnect.
+
+### Namespace on the wire
+
+When a namespace is configured, the client sends a `SetNamespace` packet right after the
+`Greeting` and before `PacketVersions` — the server has to fix the namespace before the first
+publish or subscribe. It is fire-and-forget; the client does not wait for a reply.
+
+The `default` namespace is **never** sent. A client configured with `ns=default` (or with no `ns`
+at all) puts exactly the same bytes on the wire as before this feature existed, so it keeps
+working against a bus that knows nothing about namespaces — such a node would drop the connection
+on the unknown packet id.
+
+Errors — an invalid name, or an attempt to change the namespace after the first publish/subscribe
+— come back as the usual `Reject` packet and are written to the log.
 
 ## Client creation
 ```rust
