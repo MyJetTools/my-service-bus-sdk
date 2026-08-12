@@ -93,23 +93,25 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync 
         Some(next_message)
     }
 
-    /// Pushes the current progress to the broker, no matter how long ago the previous packet
-    /// was sent.
-    ///
-    /// Fire and forget - nothing is awaited from the broker. The packet is serialized into
-    /// the outgoing buffer of the socket right here, so the only thing the caller awaits
-    /// is the lock of the reader, which is free in the vast majority of the cases.
+    /// Tells the broker "I am still alive" and pushes whatever is delivered by now.
+    /// Nothing is checked - neither how long ago the previous packet was sent, nor whether
+    /// anything has been delivered since then. An empty delivered set is a valid packet as well:
+    /// the broker takes it, confirms nothing and just resets the delivery deadline.
     ///
     /// Two things happen on the broker side:
     /// * messages which are already marked as delivered are confirmed - they are not going
     ///   to be redelivered even if the rest of the batch fails;
     /// * the delivery deadline is reset - the broker does not kick the connection off.
     ///
-    /// get_next_message() does it on its own, so this method is needed only if a single message
-    /// is handled longer than delivery_timeout on the broker side - in this case get_next_message()
-    /// is simply not called during that time. Call it from the middle of such a handler,
-    /// preferably right after message.mark_as_delivered().
-    pub async fn send_intermediary_confirmation(&self) {
+    /// Fire and forget - nothing is awaited from the broker. The packet is serialized into
+    /// the outgoing buffer of the socket right here, so the only thing the caller awaits
+    /// is the lock of the reader, which is free in the vast majority of the cases.
+    ///
+    /// get_next_message() pushes the progress on its own, so this method is needed when the loop
+    /// stays inside a single message longer than delivery_timeout on the broker side - in this case
+    /// get_next_message() is simply not called during that time. Call it from the middle of such
+    /// a handler, preferably right after message.mark_as_delivered().
+    pub async fn send_intermediary_confirm(&self) {
         let mut inner = self.inner.lock().await;
 
         send_intermediary_confirm_packet(

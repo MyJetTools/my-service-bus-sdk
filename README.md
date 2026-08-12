@@ -180,17 +180,24 @@ the delivered messages. Batches handled within milliseconds — the majority of 
 the threshold and cost nothing: no extra packets, no background tasks.
 
 The one case the SDK can not cover on its own is a **single** message handled longer than the broker
-timeout: `get_next_message()` is simply not called during that time. Push the progress manually:
+timeout: `get_next_message()` is simply not called during that time. Kick the broker manually from
+the middle of such a handler with `send_intermediary_confirm()` — it sends the current delivered set
+unconditionally, without looking at the interval or at whether anything changed:
 
 ```rust
 while let Some(msg) = messages_reader.get_next_message().await {
-    // something long
-    msg.mark_as_delivered().await;
-    // confirms everything handled so far and resets the delivery deadline.
-    // Fire and forget — the packet just goes into the outgoing buffer of the socket
-    messages_reader.send_intermediary_confirmation().await;
+    for step in long_running_steps {
+        step.execute().await;
+        // "still alive" + confirms everything delivered by now. Fire and forget —
+        // the packet just goes into the outgoing buffer of the socket
+        messages_reader.send_intermediary_confirm().await;
+    }
 }
 ```
+
+An empty delivered set is a valid packet too — the broker confirms nothing and just resets the
+delivery deadline. To have the current message counted as delivered before the kick, call
+`msg.mark_as_delivered().await` first.
 
 The interval is configurable per reader with
 `messages_reader.set_intermediary_confirmation_interval(Duration).await`, or process wide with
