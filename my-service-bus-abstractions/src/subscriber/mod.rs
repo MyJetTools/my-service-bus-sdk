@@ -1,6 +1,8 @@
 mod delivered_message;
 mod deserializer;
+mod intermediary_confirmation_settings;
 mod messages_reader;
+pub use intermediary_confirmation_settings::*;
 mod queue_type;
 mod subscriber;
 mod subscriber_callback;

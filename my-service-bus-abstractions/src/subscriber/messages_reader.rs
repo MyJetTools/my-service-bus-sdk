@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, VecDeque},
     sync::Arc,
+    time::Duration,
 };
 
 use rust_extensions::date_time::DateTimeAsMicroseconds;
@@ -62,21 +63,23 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync 
 
         let now = DateTimeAsMicroseconds::now();
 
-        let last_confirmation_time = now - inner.last_time_confirmation;
+        let since_last_confirmation = now
+            .duration_since(inner.last_time_confirmation)
+            .as_positive_or_zero();
 
-        if last_confirmation_time.get_full_seconds() >= 5 {
-            if inner.prev_intermediary_confirmation_queue.len() != inner.delivered.len() {
-                self.intermediary_confirmation.intermediary_confirm(
-                    self.data.topic_id.as_str(),
-                    self.data.queue_id.as_str(),
-                    self.confirmation_id,
-                    self.connection_id,
-                    inner.delivered.get_snapshot(),
-                );
-
-                inner.prev_intermediary_confirmation_queue = inner.delivered.clone();
-                inner.last_time_confirmation = now;
-            }
+        // Getting here means the previous message is handled - so there is always something
+        // to push. Handling of the batch is slow enough to bump into the interval - let the broker
+        // know about the progress. It confirms the messages handled so far and - since the broker
+        // resets the delivery deadline on IntermediaryConfirm - keeps the connection alive
+        if since_last_confirmation >= inner.intermediary_confirmation_interval {
+            send_intermediary_confirm_packet(
+                self.intermediary_confirmation.as_ref(),
+                self.data.as_ref(),
+                self.confirmation_id,
+                self.connection_id,
+                &mut inner,
+                now,
+            );
         }
 
         let mut next_message = inner.messages.pop_front()?;
@@ -88,6 +91,42 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync 
         );
 
         Some(next_message)
+    }
+
+    /// Pushes the current progress to the broker, no matter how long ago the previous packet
+    /// was sent.
+    ///
+    /// Fire and forget - nothing is awaited from the broker. The packet is serialized into
+    /// the outgoing buffer of the socket right here, so the only thing the caller awaits
+    /// is the lock of the reader, which is free in the vast majority of the cases.
+    ///
+    /// Two things happen on the broker side:
+    /// * messages which are already marked as delivered are confirmed - they are not going
+    ///   to be redelivered even if the rest of the batch fails;
+    /// * the delivery deadline is reset - the broker does not kick the connection off.
+    ///
+    /// get_next_message() does it on its own, so this method is needed only if a single message
+    /// is handled longer than delivery_timeout on the broker side - in this case get_next_message()
+    /// is simply not called during that time. Call it from the middle of such a handler,
+    /// preferably right after message.mark_as_delivered().
+    pub async fn send_intermediary_confirmation(&self) {
+        let mut inner = self.inner.lock().await;
+
+        send_intermediary_confirm_packet(
+            self.intermediary_confirmation.as_ref(),
+            self.data.as_ref(),
+            self.confirmation_id,
+            self.connection_id,
+            &mut inner,
+            DateTimeAsMicroseconds::now(),
+        );
+    }
+
+    /// How often get_next_message() pushes the progress to the broker. Default value is 3 seconds.
+    /// It has to be noticeably less than delivery_timeout on the broker side (30 seconds by default)
+    pub async fn set_intermediary_confirmation_interval(&self, interval: Duration) {
+        let mut inner = self.inner.lock().await;
+        inner.intermediary_confirmation_interval = interval;
     }
 
     pub async fn mark_all_failed(&self) {
@@ -112,6 +151,27 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync 
         inner.current_message_id = None;
         inner.force_all_failed = false;
     }
+}
+
+fn send_intermediary_confirm_packet<
+    TMessageModel: MySbMessageDeserializer<Item = TMessageModel>,
+>(
+    client: &(dyn MyServiceBusSubscriberClient + Send + Sync + 'static),
+    data: &SubscriberData,
+    confirmation_id: i64,
+    connection_id: i32,
+    inner: &mut MessagesReaderInner<TMessageModel>,
+    now: DateTimeAsMicroseconds,
+) {
+    client.intermediary_confirm(
+        data.topic_id.as_str(),
+        data.queue_id.as_str(),
+        confirmation_id,
+        connection_id,
+        inner.delivered.get_snapshot(),
+    );
+
+    inner.last_time_confirmation = now;
 }
 
 impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel> + Send + Sync + 'static> Drop

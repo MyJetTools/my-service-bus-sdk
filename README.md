@@ -168,6 +168,35 @@ return Err(MySbSubscriberHandleError::TheMessagesAreNotDelivered(failed));
 For per-message control inside `Ok` flow, use `MySbDeliveredMessage::mark_as_not_delivered().await`
 to drop the current message from the delivered set without bailing out of the whole batch.
 
+### Long running handlers
+
+The broker kicks the **whole connection** off if a subscriber stays in `OnDelivery` state longer
+than its `delivery_timeout` (30 seconds by default). To avoid it the SDK pushes the current progress
+as an `IntermediaryConfirm` packet — it confirms the messages handled so far and extends the timeout.
+
+Nothing has to be done for the common case: on every `get_next_message()` the SDK checks how long
+ago the previous packet was sent, and if it is more than 3 seconds — sends the current snapshot of
+the delivered messages. Batches handled within milliseconds — the majority of them — never reach
+the threshold and cost nothing: no extra packets, no background tasks.
+
+The one case the SDK can not cover on its own is a **single** message handled longer than the broker
+timeout: `get_next_message()` is simply not called during that time. Push the progress manually:
+
+```rust
+while let Some(msg) = messages_reader.get_next_message().await {
+    // something long
+    msg.mark_as_delivered().await;
+    // confirms everything handled so far and resets the delivery deadline.
+    // Fire and forget — the packet just goes into the outgoing buffer of the socket
+    messages_reader.send_intermediary_confirmation().await;
+}
+```
+
+The interval is configurable per reader with
+`messages_reader.set_intermediary_confirmation_interval(Duration).await`, or process wide with
+`my_service_bus_abstractions::subscriber::set_default_intermediary_confirmation_interval(Duration)`.
+Keep it noticeably below the broker `delivery_timeout`.
+
 ## Ignore specific message
 Set env var to skip delivery for a specific message:
 ```

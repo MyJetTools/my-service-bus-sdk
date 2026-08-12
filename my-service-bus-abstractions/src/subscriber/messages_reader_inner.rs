@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, time::Duration};
 
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 
@@ -8,8 +8,9 @@ use super::{MySbDeliveredMessage, MySbMessageDeserializer};
 
 pub struct MessagesReaderInner<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>> {
     pub delivered: QueueWithIntervals,
-    pub prev_intermediary_confirmation_queue: QueueWithIntervals,
     pub last_time_confirmation: DateTimeAsMicroseconds,
+    /// How often the progress is sent to the broker as IntermediaryConfirm packet
+    pub intermediary_confirmation_interval: Duration,
     pub current_message_id: Option<MessageId>,
     #[cfg(feature = "with-telemetry")]
     pub current_message_telemetry: Option<super::DeliveredMessageTelemetry>,
@@ -29,7 +30,8 @@ impl<TMessageModel: MySbMessageDeserializer<Item = TMessageModel>>
         Self {
             delivered: QueueWithIntervals::new(),
             last_time_confirmation: DateTimeAsMicroseconds::now(),
-            prev_intermediary_confirmation_queue: QueueWithIntervals::new(),
+            intermediary_confirmation_interval:
+                super::get_default_intermediary_confirmation_interval(),
             current_message_id: None,
             messages,
             #[cfg(feature = "with-telemetry")]
