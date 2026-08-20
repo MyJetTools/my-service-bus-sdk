@@ -1,25 +1,14 @@
-use std::num::ParseIntError;
-
 use prost::DecodeError;
-use zip::result::ZipError;
 
 #[derive(Debug)]
 pub enum CompressedPageReaderError {
-    ParseIntError(ParseIntError),
-    ZipError(ZipError),
-    InvalidSingleFileCompressedPage,
+    IoError(std::io::Error),
     DecodeError(DecodeError),
 }
 
-impl From<ZipError> for CompressedPageReaderError {
-    fn from(src: ZipError) -> Self {
-        Self::ZipError(src)
-    }
-}
-
-impl From<ParseIntError> for CompressedPageReaderError {
-    fn from(src: ParseIntError) -> Self {
-        Self::ParseIntError(src)
+impl From<std::io::Error> for CompressedPageReaderError {
+    fn from(src: std::io::Error) -> Self {
+        Self::IoError(src)
     }
 }
 

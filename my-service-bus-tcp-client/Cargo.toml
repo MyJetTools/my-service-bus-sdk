@@ -15,9 +15,7 @@ my-service-bus-tcp-shared = { path = "../my-service-bus-tcp-shared", features = 
 my-tcp-sockets = { tag = "0.1.12", git = "https://github.com/MyJetTools/my-tcp-sockets.git" }
 rust-extensions = { tag = "0.1.5", git = "https://github.com/MyJetTools/rust-extensions.git" }
 
-tokio = { version = "*", features = ["full"] }
-tokio-util = "*"
-chrono = "*"
+tokio = { version = "*", features = ["time"] }
 async-trait = "*"
 parking_lot = "*"
 arc-swap = "*"

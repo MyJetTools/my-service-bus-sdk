@@ -1,63 +1,41 @@
-use rust_extensions::{SliceOrVec, SliceOrVecSeqReader};
+use std::collections::VecDeque;
 
-use crate::protobuf_models::MessageProtobufModel;
+use rust_extensions::SliceOrVec;
 
-use super::{
-    CompressedPageReaderByFiles, CompressedPageReaderError, CompressedPageReaderSingleFile,
-};
+use crate::protobuf_models::{MessageProtobufModel, MessagesProtobufModel};
 
-pub enum CompressedPageReader<'s> {
-    ByFiles(CompressedPageReaderByFiles<'s>),
-    SingleFile(CompressedPageReaderSingleFile),
+use super::CompressedPageReaderError;
+
+pub struct CompressedPageReader {
+    messages: VecDeque<MessageProtobufModel>,
+    messages_amount: usize,
 }
 
-impl<'s> CompressedPageReader<'s> {
-    pub fn new(zipped: impl Into<SliceOrVec<'s, u8>>) -> Result<Self, CompressedPageReaderError> {
-        let zipped: SliceOrVec<'_, u8> = zipped.into();
+impl CompressedPageReader {
+    pub fn new<'s>(
+        compressed: impl Into<SliceOrVec<'s, u8>>,
+    ) -> Result<Self, CompressedPageReaderError> {
+        let compressed: SliceOrVec<'_, u8> = compressed.into();
 
-        let zipped: SliceOrVecSeqReader<'_, u8> = zipped.into();
+        let payload = crate::page_compressor::decompress_payload(compressed.as_slice())?;
 
-        let mut file_reader = CompressedPageReaderByFiles::new(zipped)?;
+        let messages = MessagesProtobufModel::parse(payload.as_slice())?;
 
-        let decompress_as_single_file = file_reader.decompress_as_single_file()?;
+        let messages: VecDeque<MessageProtobufModel> = messages.messages.into_iter().collect();
 
-        match decompress_as_single_file {
-            Some(messages) => {
-                let messages = messages.messages.into_iter().collect();
-                Ok(Self::SingleFile(CompressedPageReaderSingleFile::new(
-                    messages,
-                )?))
-            }
+        let messages_amount = messages.len();
 
-            None => Ok(Self::ByFiles(file_reader)),
-        }
+        Ok(Self {
+            messages,
+            messages_amount,
+        })
     }
 
-    pub fn get_next_message(
-        &mut self,
-    ) -> Result<Option<MessageProtobufModel>, CompressedPageReaderError> {
-        match self {
-            CompressedPageReader::ByFiles(by_files) => by_files.get_next_message(),
-            CompressedPageReader::SingleFile(by_single_file) => {
-                let result = by_single_file.get_next_message();
-                Ok(result)
-            }
-        }
-    }
-
-    pub fn get_files_amount(&self) -> usize {
-        match self {
-            CompressedPageReader::ByFiles(by_files) => by_files.get_files_amount(),
-            CompressedPageReader::SingleFile(_) => 1,
-        }
+    pub fn get_next_message(&mut self) -> Option<MessageProtobufModel> {
+        self.messages.pop_front()
     }
 
     pub fn get_messages_amount(&self) -> usize {
-        match self {
-            CompressedPageReader::ByFiles(by_files) => by_files.get_files_amount(),
-            CompressedPageReader::SingleFile(by_single_file) => {
-                by_single_file.get_messages_amount()
-            }
-        }
+        self.messages_amount
     }
 }

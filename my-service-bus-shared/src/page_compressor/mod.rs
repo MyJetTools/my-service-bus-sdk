@@ -1,6 +1,6 @@
 mod compressed_page_builder;
 mod compressed_page_reader;
-pub mod zip;
+mod payload;
 pub use compressed_page_builder::*;
 pub use compressed_page_reader::*;
-mod vec_writer;
+pub use payload::*;
