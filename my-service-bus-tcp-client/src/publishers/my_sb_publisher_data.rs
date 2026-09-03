@@ -72,7 +72,9 @@ impl MySbPublisherData {
     pub fn confirm(&mut self, request_id: i64) {
         if let Some(connection) = self.connection.as_mut() {
             if let Some(mut request) = connection.requests.remove(&request_id) {
-                request.set_ok(());
+                // Awaiter is gone when the caller stopped waiting (cancelled future, timed out
+                // timer iteration) - a confirmation nobody awaits must not panic the worker.
+                let _ = request.try_set_ok(());
             }
         }
     }
