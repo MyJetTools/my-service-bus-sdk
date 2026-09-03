@@ -22,7 +22,9 @@ impl PublishProcessByConnection {
 impl Drop for PublishProcessByConnection {
     fn drop(&mut self) {
         for (_, mut task) in self.requests.drain() {
-            task.set_error(PublishError::Disconnected);
+            // Panicking here aborts the process during unwinding and leaves the remaining
+            // requests unnotified; a dropped awaiter is expected on disconnect.
+            let _ = task.try_set_error(PublishError::Disconnected);
         }
     }
 }
