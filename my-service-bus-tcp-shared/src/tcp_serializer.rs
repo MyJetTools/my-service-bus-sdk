@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use async_trait::async_trait;
 use my_tcp_sockets::{
     socket_reader::{ReadingTcpContractFail, SocketReader},
@@ -25,7 +27,8 @@ impl TcpSocketSerializer<MySbTcpContract, MySbSerializerState> for MySbTcpSerial
         contract.serialize(out, state)
     }
 
-    fn get_ping(&self) -> MySbTcpContract {
+    // The MySB ping carries no payload, so the measured round trip has nowhere to go.
+    fn get_ping(&self, _latency: Option<Duration>) -> MySbTcpContract {
         MySbTcpContract::Ping
     }
     async fn deserialize<TSocketReader: Send + Sync + 'static + SocketReader>(
